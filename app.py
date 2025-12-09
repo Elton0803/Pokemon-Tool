@@ -5,6 +5,9 @@ import os
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
 st.title("Pokémon GO攻防計算")
 
+# ==========================================
+# 樣式設定函式 (字體28px、靠左對齊)
+# ==========================================
 def apply_style(df, float_cols=None):
     properties = {
         'text-align': 'left',  
@@ -20,9 +23,12 @@ def apply_style(df, float_cols=None):
     if float_cols:
         for col, fmt in float_cols.items():
             if col in df.columns:
-                styler = styler.format({col: fmt})     
+                styler = styler.format({col: fmt})      
     return styler
 
+# ==========================================
+# 讀取與切割資料
+# ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
         return None, None, f"❌ 找不到檔案：{filename}"
@@ -75,10 +81,13 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     except:
         return 1.0
 
+# ==========================================
+# APP 介面
+# ==========================================
 tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨對戰防禦", "⚔️ 3. DPS計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
-# 功能區1：Att.xlsx
+# 功能區1：Att.xlsx (新增 % 欄位)
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
@@ -119,8 +128,22 @@ with tab1:
                         "輸出": int(final_dmg)
                     })
                 
+                # 建立 DataFrame 並排序
                 res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
-                styled_df = apply_style(res_df)
+                
+                # ★★★ 新增：計算百分比 ★★★
+                if not res_df.empty:
+                    # 抓取第一名(最大)的傷害
+                    max_dmg = res_df["輸出"].max()
+                    
+                    if max_dmg > 0:
+                        # 計算每一列相對於最大傷害的百分比
+                        res_df["%"] = (res_df["輸出"] / max_dmg) * 100
+                    else:
+                        res_df["%"] = 0.0
+
+                # 套用樣式 (新增 % 欄位的格式設定: 小數點後1位 + %)
+                styled_df = apply_style(res_df, float_cols={'%': '{:.1f}%'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
             except Exception as e:
