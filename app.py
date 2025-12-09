@@ -2,14 +2,10 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="寶可夢極巨數據庫 (修復版)", layout="wide")
-st.title("寶可夢極巨戰鬥計算機")
+st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
+st.title("Pokémon GO攻防計算")
 
-# ==========================================
-# 樣式設定函式 (字體28px、靠左對齊)
-# ==========================================
 def apply_style(df, float_cols=None):
-    # 設定內容樣式
     properties = {
         'text-align': 'left',  
         'font-size': '28px',   
@@ -17,21 +13,16 @@ def apply_style(df, float_cols=None):
     }
     styler = df.style.set_properties(**properties)
     
-    # 設定表頭(標題)樣式
     styler = styler.set_table_styles([
         {'selector': 'th', 'props': [('text-align', 'left'), ('font-size', '28px'), ('padding-left', '10px')]}
     ])
     
-    # 數值格式化
     if float_cols:
         for col, fmt in float_cols.items():
             if col in df.columns:
                 styler = styler.format({col: fmt})     
     return styler
 
-# ==========================================
-# 讀取與切割資料
-# ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
         return None, None, f"❌ 找不到檔案：{filename}"
@@ -53,16 +44,13 @@ def load_data_and_chart(filename):
         if split_col_idx == -1:
             return None, None, "⚠️ 無法自動偵測「屬性克制表」位置"
 
-        # 切割左邊數據
         df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx))
         df_data = df_data.dropna(how='all')
-        
-        # 切割右邊克制表
+
         df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]))
         
-        # ★★★ 修正：設定索引並刪除空列 ★★★
         df_chart = df_chart.set_index(df_chart.columns[0])
-        df_chart = df_chart.dropna(how='all') # 刪除全是空的列
+        df_chart = df_chart.dropna(how='all')
         
         return df_data, df_chart, None
 
@@ -73,7 +61,6 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     try:
         atk, d1 = str(atk_type).strip(), str(def_type1).strip()
         
-        # 防呆：如果屬性是空值，直接回傳 1.0
         if not atk or atk == "nan": return 1.0
         
         if atk not in chart.index: return 1.0
@@ -88,16 +75,13 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     except:
         return 1.0
 
-# ==========================================
-# APP 介面
-# ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 攻擊輸出", "🛡️ 2. 防禦抗性", "⚔️ 3. DPS 計算", "📊 4. 屬性克制表"])
+tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨對戰防禦", "⚔️ 3. DPS計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
-# 功能 1：Att.xlsx
+# 功能區1：Att.xlsx
 # -------------------------------------------------------------------------
 with tab1:
-    st.header("攻擊輸出計算機")
+    st.header("極巨對戰輸出計算")
     df_att, chart_att, err = load_data_and_chart("Att.xlsx")
 
     if err:
@@ -146,14 +130,13 @@ with tab1:
 # 功能 2：Def.xlsx
 # -------------------------------------------------------------------------
 with tab2:
-    st.header("防禦抗性計算機")
+    st.header("極巨對戰防禦計算")
     df_def, chart_def, err = load_data_and_chart("Def.xlsx")
 
     if err:
         st.error(err)
     elif df_def is not None:
         atk_types = list(chart_def.index)
-        # 過濾掉 index 中的空值，避免選單出現空白
         valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() != "" and str(t) != "nan" and str(t) != "攻/守"]
         
         user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
@@ -196,7 +179,7 @@ with tab2:
 # 功能 3：DPS.xlsx
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS 輸出計算機")
+    st.header("DPS計算")
     df_dps, chart_dps, err = load_data_and_chart("DPS.xlsx")
 
     if err:
@@ -263,15 +246,11 @@ with tab4:
         if st.button("計算攻擊倍率", key="btn_chart"):
             chart_results = []
             
-            # ★★★ 修正核心：過濾掉空值和雜訊 ★★★
             for atk_type in chart_dps.index:
-                # 1. 檢查是否為空值 (NaN)
                 if pd.isna(atk_type): continue
-                
-                # 2. 轉字串並去除空白
+ 
                 atk_str = str(atk_type).strip()
-                
-                # 3. 過濾掉空字串或無效標題
+
                 if atk_str == "" or atk_str == "nan": continue
                 if atk_str in ["攻/守", "無", "DPS", "寶可夢"]: continue
                 
