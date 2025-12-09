@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="寶可夢極巨數據庫 (四分頁版)", layout="wide")
+st.set_page_config(page_title="寶可夢極巨數據庫 (修復版)", layout="wide")
 st.title("寶可夢極巨戰鬥計算機")
 
 # ==========================================
@@ -53,11 +53,16 @@ def load_data_and_chart(filename):
         if split_col_idx == -1:
             return None, None, "⚠️ 無法自動偵測「屬性克制表」位置"
 
+        # 切割左邊數據
         df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx))
         df_data = df_data.dropna(how='all')
         
+        # 切割右邊克制表
         df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]))
+        
+        # ★★★ 修正：設定索引並刪除空列 ★★★
         df_chart = df_chart.set_index(df_chart.columns[0])
+        df_chart = df_chart.dropna(how='all') # 刪除全是空的列
         
         return df_data, df_chart, None
 
@@ -67,6 +72,10 @@ def load_data_and_chart(filename):
 def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     try:
         atk, d1 = str(atk_type).strip(), str(def_type1).strip()
+        
+        # 防呆：如果屬性是空值，直接回傳 1.0
+        if not atk or atk == "nan": return 1.0
+        
         if atk not in chart.index: return 1.0
         
         mult1 = float(chart.loc[atk, d1]) if d1 in chart.columns else 1.0
@@ -82,7 +91,6 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
 # ==========================================
 # APP 介面
 # ==========================================
-# ★★★ 修改處：新增 Tab 4 ★★★
 tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 攻擊輸出", "🛡️ 2. 防禦抗性", "⚔️ 3. DPS 計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
@@ -145,7 +153,10 @@ with tab2:
         st.error(err)
     elif df_def is not None:
         atk_types = list(chart_def.index)
-        user_atk = st.selectbox("對手 (攻擊方) 屬性", atk_types, key="def_atk")
+        # 過濾掉 index 中的空值，避免選單出現空白
+        valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() != "" and str(t) != "nan" and str(t) != "攻/守"]
+        
+        user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
 
         if st.button("計算防禦", key="btn_def"):
             df_def.columns = df_def.columns.str.strip()
@@ -233,13 +244,11 @@ with tab3:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 4：屬性克制表 (新增功能)
+# 功能 4：屬性克制表
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表查詢")
     
-    # 這裡我們重複利用 DPS.xlsx 裡的克制表 (因為克制表都是一樣的)
-    # 如果還沒讀取過，就讀一次
     if 'chart_dps' not in locals() or chart_dps is None:
         _, chart_dps, err = load_data_and_chart("DPS.xlsx")
     
@@ -254,26 +263,29 @@ with tab4:
         if st.button("計算攻擊倍率", key="btn_chart"):
             chart_results = []
             
-            # 遍歷每一個「攻擊屬性」(也就是表格的 Index)
+            # ★★★ 修正核心：過濾掉空值和雜訊 ★★★
             for atk_type in chart_dps.index:
-                # 排除一些非屬性的列 (防呆)
-                if atk_type in ["攻/守", "無", "DPS"]: continue
+                # 1. 檢查是否為空值 (NaN)
+                if pd.isna(atk_type): continue
                 
+                # 2. 轉字串並去除空白
+                atk_str = str(atk_type).strip()
+                
+                # 3. 過濾掉空字串或無效標題
+                if atk_str == "" or atk_str == "nan": continue
+                if atk_str in ["攻/守", "無", "DPS", "寶可夢"]: continue
+                
+                # 計算
                 mult = get_multiplier(chart_dps, atk_type, chart_t1, chart_t2)
                 
                 chart_results.append({
-                    "屬性": atk_type,
-                    "倍率": f"x{round(mult, 3)}", # 顯示格式與 Tab3 一致
-                    "數值倍率": mult # 用於排序用，不顯示
+                    "屬性": atk_str,
+                    "倍率": f"x{round(mult, 3)}", 
+                    "數值倍率": mult 
                 })
             
-            # 排序：倍率由大到小
             res_chart = pd.DataFrame(chart_results).sort_values(by="數值倍率", ascending=False)
-            
-            # 選取顯示欄位 (第一欄:屬性 / 第二欄:倍率)
             res_chart = res_chart[["屬性", "倍率"]]
-            
-            # 套用樣式 (大字體、靠左)
             styled_chart = apply_style(res_chart)
             st.dataframe(styled_chart, use_container_width=True, hide_index=True)
     else:
