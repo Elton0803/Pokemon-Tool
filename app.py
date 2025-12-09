@@ -2,21 +2,27 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="寶可夢戰鬥數據庫", layout="wide")
+st.set_page_config(page_title="寶可夢數據庫", layout="wide")
 st.title("寶可夢戰鬥計算機")
 
 # ==========================================
-# 樣式設定函式 (字體24、置中)
+# 樣式設定函式 (字體24、靠左對齊)
 # ==========================================
 def apply_style(df, float_cols=None):
+    # 設定內容樣式
     properties = {
-        'text-align': 'center',
+        'text-align': 'left',  # ★★★ 修改處：改為靠左 ★★★
         'font-size': '24px',
+        'padding-left': '10px' # 增加一點左邊距比較好看
     }
     styler = df.style.set_properties(**properties)
+    
+    # 設定表頭(標題)樣式
     styler = styler.set_table_styles([
-        {'selector': 'th', 'props': [('text-align', 'center'), ('font-size', '24px')]}
+        {'selector': 'th', 'props': [('text-align', 'left'), ('font-size', '24px'), ('padding-left', '10px')]}
     ])
+    
+    # 數值格式化
     if float_cols:
         for col, fmt in float_cols.items():
             if col in df.columns:
@@ -76,13 +82,13 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
 # ==========================================
 # APP 介面
 # ==========================================
-tab1, tab2, tab3 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨抗性防禦", "⚔️ 3. DPS 計算"])
+tab1, tab2, tab3 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨抗性防禦", "⚔️ 3. DPS計算"])
 
 # -------------------------------------------------------------------------
 # 功能 1：Att.xlsx
 # -------------------------------------------------------------------------
 with tab1:
-    st.header("極巨對戰攻擊計算機")
+    st.header("極巨對戰輸出計算")
     df_att, chart_att, err = load_data_and_chart("Att.xlsx")
 
     if err:
@@ -121,6 +127,7 @@ with tab1:
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
+                # 套用樣式 (靠左)
                 styled_df = apply_style(res_df)
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
@@ -131,7 +138,7 @@ with tab1:
 # 功能 2：Def.xlsx
 # -------------------------------------------------------------------------
 with tab2:
-    st.header("極巨對戰防禦計算機")
+    st.header("極巨對戰防禦計算")
     df_def, chart_def, err = load_data_and_chart("Def.xlsx")
 
     if err:
@@ -168,6 +175,7 @@ with tab2:
                 
                 res_df = pd.DataFrame(results).sort_values(by="防禦", ascending=False)
                 res_df = res_df[["寶可夢", "自身屬性", "防禦"]]
+                # 套用樣式 (靠左)
                 styled_df = apply_style(res_df, float_cols={'防禦': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
@@ -175,10 +183,10 @@ with tab2:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 3：DPS.xlsx (修改處：倍率顯示)
+# 功能 3：DPS.xlsx
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算機")
+    st.header("DPS 計算")
     df_dps, chart_dps, err = load_data_and_chart("DPS.xlsx")
 
     if err:
@@ -210,11 +218,6 @@ with tab3:
                     mult = get_multiplier(chart_dps, atk_type, dps_t1, dps_t2)
                     final_dps = base_dps * mult
                     
-                    # -------------------------------------------
-                    # ★★★ 修正倍率顯示 ★★★
-                    # round(mult, 3) 會把 2.56000... 變成 2.56
-                    # 0.390625 變成 0.391
-                    # -------------------------------------------
                     results.append({
                         "寶可夢": name,
                         "屬性": atk_type,
@@ -224,6 +227,7 @@ with tab3:
                 
                 res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
                 res_df = res_df[["寶可夢", "屬性", "倍率", "DPS"]]
+                # 套用樣式 (靠左)
                 styled_df = apply_style(res_df, float_cols={'DPS': '{:.2f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
