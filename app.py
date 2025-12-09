@@ -6,9 +6,6 @@ import os
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
 st.title("Pokémon GO攻防計算")
 
-# ==========================================
-# 樣式設定函式 (字體28px、靠左對齊)
-# ==========================================
 def apply_style(df, float_cols=None):
     properties = {
         'text-align': 'left',  
@@ -132,16 +129,13 @@ with tab1:
                 res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
                 
                 if not res_df.empty:
-                    
                     max_dmg = res_df["輸出"].max()
                     
                     if max_dmg > 0:
-                       
-                        res_df["%"] = (res_df["輸出"] / max_dmg) * 100
+                        res_df["強度%"] = (res_df["輸出"] / max_dmg) * 100
                     else:
-                        res_df["%"] = 0.0
+                        res_df["強度%"] = 0.0
 
-                
                 styled_df = apply_style(res_df, float_cols={'強度%': '{:.1f}%'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
