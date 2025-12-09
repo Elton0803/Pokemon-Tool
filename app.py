@@ -9,7 +9,7 @@ st.title("Pokémon GO攻防計算")
 def apply_style(df, float_cols=None):
     properties = {
         'text-align': 'left',  
-        'font-size': '14px',   
+        'font-size': '28px',   
         'padding': '12px 10px' 
     }
     styler = df.style.set_properties(**properties)
