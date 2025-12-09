@@ -2,212 +2,302 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="寶可夢極巨數據庫", layout="wide")
-st.title("寶可夢極巨戰鬥計算機 (指定欄位版)")
-
-# 檔名設定
-excel_file = "Pokemon.xlsx"
-SHEET_TYPE = "屬性克制表"
-SHEET_DATA = "攻守數據"
+st.set_page_config(page_title="寶可夢數據計算機 (三合一版)", layout="wide")
+st.title("寶可夢數據計算機 📊")
+st.caption("支援 Att.xlsx, Def.xlsx, DPS.xlsx 獨立運算")
 
 # ==========================================
-# 0. 核心：讀取屬性克制表 (用於計算倍率)
+# 共用函數：讀取屬性克制表 (Type Chart)
 # ==========================================
-# 我們需要這張表來算出 "屬性變更" 後的結果
-df_type_chart = None
-try:
-    if os.path.exists(excel_file):
-        # 假設克制表矩陣在 A1 開始的區域，直接讀取
-        # index_col=0 代表第一欄是攻擊方屬性
-        df_type_chart = pd.read_excel(excel_file, sheet_name=SHEET_TYPE, index_col=0)
-    else:
-        st.error(f"❌ 找不到檔案：{excel_file}")
-        st.stop()
-except:
-    st.error("❌ 讀取「屬性克制表」失敗，請檢查工作表名稱。")
-    st.stop()
-
-# 定義計算倍率的函數
-def get_multiplier(atk_type, def_type1, def_type2):
+def load_type_chart(df, sheet_name):
+    """
+    嘗試從 Dataframe 中尋找屬性克制表矩陣。
+    通常特徵是：第一列或某列包含 '一般', '火', '水'...
+    """
     try:
-        if df_type_chart is None: return 1.0
-        # 去除空白並轉字串
-        atk_type = str(atk_type).strip()
-        def_type1 = str(def_type1).strip()
-        
-        # 查表
-        m1 = float(df_type_chart.loc[atk_type, def_type1]) if (atk_type in df_type_chart.index and def_type1 in df_type_chart.columns) else 1.0
-        
-        m2 = 1.0
-        if pd.notna(def_type2) and str(def_type2) != "無":
-             dt2 = str(def_type2).strip()
-             if dt2 in df_type_chart.columns:
-                 m2 = float(df_type_chart.loc[atk_type, dt2])
-        return m1 * m2
-    except:
-        return 1.0
-
-# ==========================================
-# APP 介面
-# ==========================================
-tab1, tab2, tab3 = st.tabs(["功能 1 (輸出排序)", "功能 2 (抗性防禦)", "功能 3 (DPS排序)"])
-
-# ==========================================
-# 功能 1：讀取 J, K, O 欄 (J2:J21, K2:K21, O2:O21)
-# ==========================================
-with tab1:
-    st.header("功能 1：選擇防守方屬性，輸出由大排到小")
-    st.caption("讀取資料來源：Pokemon.xlsx [攻守數據] 工作表 (J, K, O 欄)")
-
-    # 1. 介面：選擇屬性 (模擬變更 L1, M1)
-    c1, c2 = st.columns(2)
-    with c1:
-        def_t1 = st.selectbox("防守方屬性 1 (變更 L1)", df_type_chart.columns, key="f1_t1")
-    with c2:
-        options = ["無"] + list(df_type_chart.columns)
-        def_t2 = st.selectbox("防守方屬性 2 (變更 M1)", options, key="f1_t2")
-
-    # 2. 讀取資料 (J, K, O 欄)
-    # Pandas 的 usecols 接受 "J,K,O" 這種寫法，非常方便
-    try:
-        # header=1 代表 Excel 的第 2 列是標題 (因為資料是從 J2 開始) -> 實際上 Python index 從 0 開始，所以 Row 1 是 header
-        # 根據您的描述，J1, K1, O1 應該是標題，J2 開始是數據
-        df_f1 = pd.read_excel(excel_file, sheet_name=SHEET_DATA, usecols="J,K,O")
-        
-        # 重新命名欄位以利程式識別 (依序是 J, K, O)
-        df_f1.columns = ["寶可夢", "招式屬性", "基礎輸出"]
-        
-        # 清除空值 (只讀取有數據的部分)
-        df_f1 = df_f1.dropna()
-
-        # 3. 計算與排序
-        if st.button("計算並排序", key="btn_f1"):
-            results = []
-            for idx, row in df_f1.iterrows():
-                # 取得數據
-                p_name = row["寶可夢"]
-                p_type = row["招式屬性"]
-                base_dmg = row["基礎輸出"]
-
-                # 計算倍率
-                mult = get_multiplier(p_type, def_t1, def_t2)
-                final_dmg = base_dmg * mult
-
-                results.append({
-                    "寶可夢": p_name,
-                    "屬性": p_type,
-                    "基礎輸出": base_dmg,
-                    "倍率": f"x{mult}",
-                    "最終輸出": int(final_dmg)
-                })
-            
-            # 轉成 DataFrame 並由大排到小
-            res_df = pd.DataFrame(results).sort_values(by="最終輸出", ascending=False)
-            st.dataframe(res_df, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"讀取 J,K,O 欄位失敗：{e}")
-
-# ==========================================
-# 功能 2：讀取 A, B 欄 (模擬變更 A1)
-# ==========================================
-with tab2:
-    st.header("功能 2：選擇守方屬性，抗性防禦由大排到小")
-    st.caption("讀取資料來源：Pokemon.xlsx [攻守數據] 工作表")
-    
-    # 邏輯說明：
-    # 由於 Python 不能真的去改 Excel 的 A1 讓 Excel 自己跑 filter，
-    # 我們必須去讀取 Excel 裡「所有的防守排行資料」，然後幫您抓出您要的那一欄。
-    
-    target_attr = st.selectbox("選擇守方屬性 (變更 A1)", df_type_chart.columns, key="f2_t1")
-
-    try:
-        # 讀取整個工作表的前幾列，用來找屬性在哪裡
-        # header=0 (第一列) 通常是分類 (如: 格鬥, 地面...)
-        # header=1 (第二列) 通常是標題 (如: 寶可夢, 抗性防禦...)
-        df_all = pd.read_excel(excel_file, sheet_name=SHEET_DATA, header=0) # 讀取第一列分類
-        
-        # 尋找使用者選的屬性在哪一欄 (例如 "格鬥" 在第 A 欄)
-        found_col_index = -1
-        
-        # 掃描第一列的所有標題
-        for idx, col_name in enumerate(df_all.columns):
-            if str(col_name).strip() == target_attr:
-                found_col_index = idx
+        # 尋找包含 "一般" 的那一列作為標題列 (Header)
+        # 我們掃描前 10 列
+        header_idx = -1
+        for i, row in df.head(10).iterrows():
+            # 轉成字串並檢查是否包含關鍵屬性
+            row_str = row.astype(str).values
+            if "一般" in row_str and "火" in row_str:
+                header_idx = i
                 break
         
-        if found_col_index != -1:
-            # 找到了！讀取這一欄(寶可夢) 和 右邊那一欄(數值)
-            # 使用 usecols 讀取特定兩欄
-            df_f2 = pd.read_excel(excel_file, sheet_name=SHEET_DATA, header=1, usecols=[found_col_index, found_col_index+1])
+        if header_idx != -1:
+            # 重讀一次，以這一列為 header
+            # 注意：這裡假設克制表在右側，我們需要把這一列當成 columns
+            # 簡單起見，我們直接切分 DataFrame
             
-            # 重新命名 (因為抓進來的標題可能是 '寶可夢.1' 之類的)
-            df_f2.columns = ["寶可夢", "抗性防禦"]
+            # 抓取該列作為欄位名稱
+            new_columns = df.iloc[header_idx]
+            # 建立新的 DF，從下一列開始
+            chart_df = df.iloc[header_idx+1:].copy()
+            chart_df.columns = new_columns
             
-            # 排序：抗性防禦由大排到小
-            df_f2 = df_f2.sort_values(by="抗性防禦", ascending=False).dropna()
+            # 設定 Index：通常第一欄是攻擊方屬性
+            # 我們尋找欄位名稱是 "攻/守" 或 "屬性" 或 NaN 的第一欄
+            # 這裡假設克制表的 Index 在該區域的第一欄
             
-            st.write(f"顯示 **{target_attr}** 屬性的排名：")
-            st.dataframe(df_f2, use_container_width=True)
-        else:
-            st.warning(f"在工作表的第一列找不到「{target_attr}」這個分類。請確認 Excel 格式。")
-            # 備用方案：如果真的只是要讀 A, B 欄 (不論 A1 選什麼)
-            if st.checkbox("強制讀取 A, B 欄 (不搜尋屬性)"):
-                df_force = pd.read_excel(excel_file, sheet_name=SHEET_DATA, usecols="A,B", header=1)
-                df_force.columns = ["寶可夢", "抗性防禦"]
-                st.dataframe(df_force.sort_values(by="抗性防禦", ascending=False))
-
+            # 嘗試找到 "一般" 所在的欄位索引，從那裡開始切
+            start_col = -1
+            for idx, col in enumerate(chart_df.columns):
+                if str(col).strip() == "一般":
+                    start_col = idx
+                    break
+            
+            if start_col > 0:
+                # 設定索引為 "一般" 前面的那一欄 (通常是攻擊方屬性)
+                chart_df = chart_df.set_index(chart_df.columns[start_col-1])
+                # 只保留屬性欄位
+                valid_types = ["一般", "火", "水", "草", "電", "冰", "格鬥", "毒", "地面", "飛行", "超能力", "蟲", "岩石", "幽靈", "龍", "惡", "鋼", "妖精"]
+                # 過濾欄位
+                cols_to_keep = [c for c in chart_df.columns if str(c).strip() in valid_types]
+                chart_df = chart_df[cols_to_keep]
+                
+                # 轉成數字，非數字補 1.0
+                chart_df = chart_df.apply(pd.to_numeric, errors='coerce').fillna(1.0)
+                return chart_df
+                
     except Exception as e:
-        st.error(f"讀取資料失敗：{e}")
+        st.error(f"解析屬性表失敗: {e}")
+    
+    return None
+
+def get_multiplier(chart, atk_type, def_type1, def_type2):
+    if chart is None: return 1.0
+    atk = str(atk_type).strip()
+    mult = 1.0
+    
+    # 對第一屬性
+    if atk in chart.index and def_type1 in chart.columns:
+        mult *= chart.loc[atk, def_type1]
+    
+    # 對第二屬性
+    if pd.notna(def_type2) and def_type2 in chart.columns and def_type2 != "無":
+        mult *= chart.loc[atk, def_type2]
+        
+    return mult
 
 # ==========================================
-# 功能 3：讀取 V, W, X, Y 欄 (V2:Y19)
+# 介面分頁
+# ==========================================
+tab1, tab2, tab3 = st.tabs(["⚔️ 1. 攻擊計算 (Att)", "🛡️ 2. 防禦計算 (Def)", "⚡ 3. DPS 計算 (DPS)"])
+
+# ==========================================
+# 功能 1：Att.xlsx
+# ==========================================
+with tab1:
+    st.header("1. 攻擊輸出計算")
+    file_att = "Att.xlsx"
+    
+    if os.path.exists(file_att):
+        try:
+            # 讀取整個表
+            df_att_raw = pd.read_excel(file_att, header=None) # 先不設 header，手動抓
+            
+            # 解析屬性表 (從右邊抓)
+            chart_att = load_type_chart(df_att_raw, "Att")
+            
+            if chart_att is not None:
+                # 介面：選擇防守方屬性
+                c1, c2 = st.columns(2)
+                types = list(chart_att.columns)
+                def1 = c1.selectbox("防守屬性 1", types, key="att_d1")
+                def2 = c2.selectbox("防守屬性 2", ["無"] + types, key="att_d2")
+                
+                # 側邊欄設定：攻擊數據欄位
+                st.sidebar.markdown("---")
+                st.sidebar.subheader("⚔️ Att.xlsx 欄位設定")
+                
+                # 嘗試讀取資料部分 (假設在左邊)
+                # 我們讓使用者指定 Header 所在的列 (通常是第1列)
+                header_row = st.sidebar.number_input("Att 資料標題在第幾列? (0表示第一列)", min_value=0, value=0, key="att_h_row")
+                df_att_data = pd.read_excel(file_att, header=header_row)
+                cols = list(df_att_data.columns)
+                
+                col_name = st.sidebar.selectbox("寶可夢名稱", cols, index=0 if len(cols)>0 else 0, key="att_c1")
+                col_type = st.sidebar.selectbox("屬性", cols, index=1 if len(cols)>1 else 0, key="att_c2")
+                col_stab = st.sidebar.selectbox("屬修 (Y/N)", cols, index=2 if len(cols)>2 else 0, key="att_c3")
+                col_base = st.sidebar.selectbox("基礎攻擊", cols, index=3 if len(cols)>3 else 0, key="att_c4")
+                col_giga = st.sidebar.selectbox("超級巨/極巨 (G/D)", cols, index=4 if len(cols)>4 else 0, key="att_c5")
+                
+                if st.button("計算攻擊輸出", key="btn_att"):
+                    results = []
+                    # 清洗數據
+                    clean_data = df_att_data[[col_name, col_type, col_stab, col_base, col_giga]].dropna()
+                    
+                    for idx, row in clean_data.iterrows():
+                        p_name = row[col_name]
+                        p_type = row[col_type]
+                        p_stab = str(row[col_stab]).strip().upper()
+                        p_base = float(row[col_base]) if pd.notna(row[col_base]) else 0
+                        p_giga = str(row[col_giga]).strip().upper()
+                        
+                        # 公式：基礎攻擊 * 屬修 * 極巨倍率 * 克制倍率
+                        
+                        # 1. 屬修
+                        mult_stab = 1.2 if p_stab == 'Y' else 1.0
+                        
+                        # 2. 極巨倍率
+                        mult_giga = 1.0
+                        if 'G' in p_giga: mult_giga = 450
+                        elif 'D' in p_giga: mult_giga = 350
+                        else: mult_giga = 350 # 預設
+                        
+                        # 3. 克制倍率
+                        mult_type = get_multiplier(chart_att, p_type, def1, def2)
+                        
+                        final_dmg = p_base * mult_stab * mult_giga * mult_type
+                        
+                        results.append({
+                            "寶可夢": p_name,
+                            "屬性": p_type,
+                            "基礎": p_base,
+                            "屬修": p_stab,
+                            "極巨": p_giga,
+                            "克制": f"x{mult_type:.2f}",
+                            "輸出": int(final_dmg)
+                        })
+                    
+                    res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
+                    st.dataframe(res_df[[ "寶可夢", "屬性", "輸出", "克制", "基礎", "屬修", "極巨"]], use_container_width=True)
+            else:
+                st.error("無法在 Att.xlsx 中找到屬性克制表，請確認格式。")
+        except Exception as e:
+            st.error(f"讀取 Att.xlsx 錯誤: {e}")
+    else:
+        st.warning("找不到 Att.xlsx")
+
+# ==========================================
+# 功能 2：Def.xlsx
+# ==========================================
+with tab2:
+    st.header("2. 防禦數值計算")
+    file_def = "Def.xlsx"
+    
+    if os.path.exists(file_def):
+        try:
+            df_def_raw = pd.read_excel(file_def, header=None)
+            chart_def = load_type_chart(df_def_raw, "Def")
+            
+            if chart_def is not None:
+                # 介面：選擇攻擊方屬性
+                types = list(chart_def.columns)
+                atk_type = st.selectbox("攻擊方屬性", types, key="def_a1")
+                
+                # 側邊欄設定
+                st.sidebar.markdown("---")
+                st.sidebar.subheader("🛡️ Def.xlsx 欄位設定")
+                header_row_def = st.sidebar.number_input("Def 資料標題在第幾列?", min_value=0, value=0, key="def_h_row")
+                df_def_data = pd.read_excel(file_def, header=header_row_def)
+                cols = list(df_def_data.columns)
+                
+                col_d_name = st.sidebar.selectbox("寶可夢名稱", cols, index=0, key="def_c1")
+                col_d_t1 = st.sidebar.selectbox("屬性1", cols, index=1 if len(cols)>1 else 0, key="def_c2")
+                col_d_t2 = st.sidebar.selectbox("屬性2", cols, index=2 if len(cols)>2 else 0, key="def_c3")
+                col_d_val = st.sidebar.selectbox("防禦數值", cols, index=3 if len(cols)>3 else 0, key="def_c4")
+                
+                if st.button("計算防禦", key="btn_def"):
+                    results = []
+                    clean_data = df_def_data[[col_d_name, col_d_t1, col_d_val]].dropna() # t2 可空
+                    
+                    for idx, row in clean_data.iterrows():
+                        p_name = row[col_d_name]
+                        p_t1 = row[col_d_t1]
+                        p_t2 = df_def_data.loc[idx, col_d_t2] # 獨立抓避免 dropna 掉單屬性
+                        p_val = float(row[col_d_val])
+                        
+                        # 公式：防禦 * 屬性克制表的值
+                        # 注意：這裡是指「攻擊方 vs 該寶可夢」的倍率
+                        
+                        # 查表: 攻擊方 vs 屬性1
+                        m1 = 1.0
+                        if atk_type in chart_def.index and p_t1 in chart_def.columns:
+                            m1 = chart_def.loc[atk_type, p_t1]
+                            
+                        # 查表: 攻擊方 vs 屬性2
+                        m2 = 1.0
+                        if pd.notna(p_t2) and p_t2 in chart_def.columns and p_t2 != "無":
+                            m2 = chart_def.loc[atk_type, p_t2]
+                        
+                        total_mult = m1 * m2
+                        final_def = p_val * total_mult
+                        
+                        results.append({
+                            "寶可夢": p_name,
+                            "屬性1": p_t1,
+                            "屬性2": p_t2 if pd.notna(p_t2) else "無",
+                            "原始防禦": p_val,
+                            "克制倍率": f"x{total_mult:.2f}",
+                            "防禦": final_def # 根據您的公式 (防禦 * 克制值)
+                        })
+                        
+                    res_df = pd.DataFrame(results).sort_values(by="防禦", ascending=False)
+                    st.dataframe(res_df[["寶可夢", "防禦", "屬性1", "屬性2", "原始防禦", "克制倍率"]], use_container_width=True)
+            else:
+                st.error("無法在 Def.xlsx 中找到屬性克制表。")
+        except Exception as e:
+            st.error(f"讀取 Def.xlsx 錯誤: {e}")
+    else:
+        st.warning("找不到 Def.xlsx")
+
+# ==========================================
+# 功能 3：DPS.xlsx
 # ==========================================
 with tab3:
-    st.header("功能 3：選擇防守方屬性，DPS 由大排到小")
-    st.caption("讀取資料來源：Pokemon.xlsx [屬性克制表] 工作表 (V, W, Y 欄)")
-
-    # 1. 介面 (模擬變更 V1, W1)
-    c1, c2 = st.columns(2)
-    with c1:
-        dps_t1 = st.selectbox("防守方屬性 1 (變更 V1)", df_type_chart.columns, key="f3_t1")
-    with c2:
-        opt_dps = ["無"] + list(df_type_chart.columns)
-        dps_t2 = st.selectbox("防守方屬性 2 (變更 W1)", opt_dps, key="f3_t2")
-
-    # 2. 讀取資料 (V, W, Y 欄)
-    # 假設 V=寶可夢, W=屬性, X=?, Y=DPS
-    try:
-        # V 是第 22 欄 (Excel), W=23, Y=25. Python index 分別是 21, 22, 24
-        # 使用 usecols="V,W,Y" 最準確
-        df_f3 = pd.read_excel(excel_file, sheet_name=SHEET_TYPE, usecols="V,W,Y")
-        
-        # 假設第一列 (Row 1) 是標題
-        df_f3.columns = ["寶可夢", "招式屬性", "基礎DPS"]
-        df_f3 = df_f3.dropna()
-
-        if st.button("計算 DPS 排名", key="btn_f3"):
-            dps_results = []
-            for idx, row in df_f3.iterrows():
-                p_name = row["寶可夢"]
-                p_type = row["招式屬性"]
-                base_dps = row["基礎DPS"]
-
-                # 計算倍率
-                mult = get_multiplier(p_type, dps_t1, dps_t2)
-                final_dps = base_dps * mult
-
-                dps_results.append({
-                    "寶可夢": p_name,
-                    "屬性": p_type,
-                    "基礎DPS": base_dps,
-                    "倍率": f"x{mult}",
-                    "最終DPS": final_dps
-                })
-
-            # 轉 DataFrame 並排序
-            res_dps = pd.DataFrame(dps_results).sort_values(by="最終DPS", ascending=False)
-            st.dataframe(res_dps, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"讀取 V,W,Y 欄位失敗：{e}")
+    st.header("3. DPS 計算")
+    file_dps = "DPS.xlsx"
+    
+    if os.path.exists(file_dps):
+        try:
+            df_dps_raw = pd.read_excel(file_dps, header=None)
+            chart_dps = load_type_chart(df_dps_raw, "DPS")
+            
+            if chart_dps is not None:
+                c1, c2 = st.columns(2)
+                types = list(chart_dps.columns)
+                def1 = c1.selectbox("防守屬性 1", types, key="dps_d1")
+                def2 = c2.selectbox("防守屬性 2", ["無"] + types, key="dps_d2")
+                
+                # 側邊欄
+                st.sidebar.markdown("---")
+                st.sidebar.subheader("⚡ DPS.xlsx 欄位設定")
+                header_row_dps = st.sidebar.number_input("DPS 資料標題在第幾列?", min_value=0, value=0, key="dps_h_row")
+                df_dps_data = pd.read_excel(file_dps, header=header_row_dps)
+                cols = list(df_dps_data.columns)
+                
+                col_dps_name = st.sidebar.selectbox("寶可夢名稱", cols, index=0, key="dps_c1")
+                col_dps_type = st.sidebar.selectbox("屬性", cols, index=1 if len(cols)>1 else 0, key="dps_c2")
+                col_dps_val = st.sidebar.selectbox("DPS 數值", cols, index=2 if len(cols)>2 else 0, key="dps_c3")
+                
+                if st.button("計算 DPS", key="btn_dps"):
+                    results = []
+                    clean_data = df_dps_data[[col_dps_name, col_dps_type, col_dps_val]].dropna()
+                    
+                    for idx, row in clean_data.iterrows():
+                        p_name = row[col_dps_name]
+                        p_type = row[col_dps_type]
+                        p_dps = float(row[col_dps_val])
+                        
+                        # 公式：DPS * 屬性克制表的值
+                        mult = get_multiplier(chart_dps, p_type, def1, def2)
+                        final_dps = p_dps * mult
+                        
+                        results.append({
+                            "寶可夢": p_name,
+                            "屬性": p_type,
+                            "原始DPS": p_dps,
+                            "克制倍率": f"x{mult:.2f}",
+                            "DPS": final_dps
+                        })
+                    
+                    res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
+                    st.dataframe(res_df[["寶可夢", "屬性", "DPS", "原始DPS", "克制倍率"]], use_container_width=True)
+            else:
+                st.error("無法在 DPS.xlsx 中找到屬性克制表。")
+        except Exception as e:
+            st.error(f"讀取 DPS.xlsx 錯誤: {e}")
+    else:
+        st.warning("找不到 DPS.xlsx")
