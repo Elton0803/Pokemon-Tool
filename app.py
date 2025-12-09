@@ -25,7 +25,7 @@ def apply_style(df, float_cols=None):
     return styler
 
 # ==========================================
-# 讀取與切割資料
+# 資料
 # ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
@@ -80,12 +80,12 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
         return 1.0
 
 # ==========================================
-# 介面設定
+# 介面
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨對戰防禦", "⚔️ 3. DPS計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
-# 功能區1：Att.xlsx (新增 % 欄位)
+# 功能區1：Att.xlsx
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
@@ -130,7 +130,6 @@ with tab1:
                 
                 if not res_df.empty:
                     max_dmg = res_df["輸出"].max()
-                    
                     if max_dmg > 0:
                         res_df["強度%"] = (res_df["輸出"] / max_dmg) * 100
                     else:
@@ -243,11 +242,20 @@ with tab3:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 4：屬性克制表
+# 功能 4：屬性克制表 (上方大圖 + 文字列表)
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表")
+
+    chart_img_path = "chart.png"
+    if os.path.exists(chart_img_path):
+        st.image(chart_img_path, caption="屬性克制表", use_container_width=True)
+    elif os.path.exists("chart.jpg"):
+        st.image("chart.jpg", caption="屬性克制表", use_container_width=True)
     
+    st.divider() # 分隔線
+    st.subheader("屬性弱點計算器")
+
     if 'chart_dps' not in locals() or chart_dps is None:
         _, chart_dps, err = load_data_and_chart("DPS.xlsx")
     
@@ -264,15 +272,12 @@ with tab4:
             
             for atk_type in chart_dps.index:
                 if pd.isna(atk_type): continue
- 
                 atk_str = str(atk_type).strip()
-
                 if atk_str == "" or atk_str == "nan": continue
                 if atk_str in ["攻/守", "無", "DPS", "寶可夢"]: continue
                 
-                # 計算
                 mult = get_multiplier(chart_dps, atk_type, chart_t1, chart_t2)
-                
+
                 chart_results.append({
                     "屬性": atk_str,
                     "倍率": f"x{round(mult, 3)}", 
@@ -280,8 +285,14 @@ with tab4:
                 })
             
             res_chart = pd.DataFrame(chart_results).sort_values(by="數值倍率", ascending=False)
-            res_chart = res_chart[["屬性", "倍率"]]
+            res_chart = res_chart[["屬性", "倍率"]] 
+            
             styled_chart = apply_style(res_chart)
-            st.dataframe(styled_chart, use_container_width=True, hide_index=True)
+            
+            st.dataframe(
+                styled_chart, 
+                use_container_width=True, 
+                hide_index=True
+            )
     else:
         st.error("無法讀取屬性克制表，請聯絡eltons0803@gmail.com")
