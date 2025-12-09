@@ -90,9 +90,9 @@ with tab1:
         c1, c2 = st.columns(2)
         with c1:
             types = list(chart_att.columns)
-            def_t1 = st.selectbox("防守方屬性 1", types, key="att_t1")
+            def_t1 = st.selectbox("對手(防守方)屬性 1", types, key="att_t1")
         with c2:
-            def_t2 = st.selectbox("防守方屬性 2", ["無"] + types, key="att_t2")
+            def_t2 = st.selectbox("對手(防守方)屬性 2", ["無"] + types, key="att_t2")
 
         if st.button("計算輸出", key="btn_att"):
             df_att.columns = df_att.columns.str.strip()
