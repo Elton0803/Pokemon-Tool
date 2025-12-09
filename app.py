@@ -188,9 +188,9 @@ with tab3:
         c1, c2 = st.columns(2)
         with c1:
             types = list(chart_dps.columns)
-            dps_t1 = st.selectbox("防守方屬性 1", types, key="dps_t1")
+            dps_t1 = st.selectbox("對手(防守方)屬性 1", types, key="dps_t1")
         with c2:
-            dps_t2 = st.selectbox("防守方屬性 2", ["無"] + types, key="dps_t2")
+            dps_t2 = st.selectbox("對手(防守方)屬性 2", ["無"] + types, key="dps_t2")
 
         if st.button("計算 DPS", key="btn_dps"):
             df_dps.columns = df_dps.columns.str.strip()
