@@ -6,20 +6,20 @@ st.set_page_config(page_title="寶可夢數據庫", layout="wide")
 st.title("寶可夢戰鬥計算機")
 
 # ==========================================
-# 樣式設定函式 (字體24、靠左對齊)
+# 樣式設定函式 (字體加大至 28px、靠左對齊)
 # ==========================================
 def apply_style(df, float_cols=None):
     # 設定內容樣式
     properties = {
-        'text-align': 'left',  # ★★★ 修改處：改為靠左 ★★★
-        'font-size': '24px',
-        'padding-left': '10px' # 增加一點左邊距比較好看
+        'text-align': 'left',  
+        'font-size': '28px',   # ★★★ 修改處：加大字體到 28px ★★★
+        'padding': '12px 10px' # 增加一點內距讓表格不要太擠
     }
     styler = df.style.set_properties(**properties)
     
     # 設定表頭(標題)樣式
     styler = styler.set_table_styles([
-        {'selector': 'th', 'props': [('text-align', 'left'), ('font-size', '24px'), ('padding-left', '10px')]}
+        {'selector': 'th', 'props': [('text-align', 'left'), ('font-size', '28px'), ('padding-left', '10px')]}
     ])
     
     # 數值格式化
@@ -127,7 +127,7 @@ with tab1:
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
-                # 套用樣式 (靠左)
+                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df)
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
@@ -175,7 +175,7 @@ with tab2:
                 
                 res_df = pd.DataFrame(results).sort_values(by="防禦", ascending=False)
                 res_df = res_df[["寶可夢", "自身屬性", "防禦"]]
-                # 套用樣式 (靠左)
+                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df, float_cols={'防禦': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
@@ -183,7 +183,7 @@ with tab2:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 3：DPS.xlsx
+# 功能 3：DPS.xlsx (修改處：欄位順序調換、字體加大)
 # -------------------------------------------------------------------------
 with tab3:
     st.header("DPS 計算")
@@ -226,8 +226,14 @@ with tab3:
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
-                res_df = res_df[["寶可夢", "屬性", "倍率", "DPS"]]
-                # 套用樣式 (靠左)
+                
+                # -------------------------------------------
+                # ★★★ 修改處：重新排列欄位順序 ★★★
+                # 順序變更為：屬性 -> 倍率 -> DPS -> 寶可夢
+                # -------------------------------------------
+                res_df = res_df[["屬性", "倍率", "DPS", "寶可夢"]]
+                
+                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df, float_cols={'DPS': '{:.2f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
