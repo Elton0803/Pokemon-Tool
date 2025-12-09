@@ -2,18 +2,18 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="寶可夢數據庫", layout="wide")
-st.title("寶可夢戰鬥計算機")
+st.set_page_config(page_title="寶可夢極巨數據庫 (四分頁版)", layout="wide")
+st.title("寶可夢極巨戰鬥計算機")
 
 # ==========================================
-# 樣式設定函式 (字體加大至 28px、靠左對齊)
+# 樣式設定函式 (字體28px、靠左對齊)
 # ==========================================
 def apply_style(df, float_cols=None):
     # 設定內容樣式
     properties = {
         'text-align': 'left',  
-        'font-size': '28px',   # ★★★ 修改處：加大字體到 28px ★★★
-        'padding': '12px 10px' # 增加一點內距讓表格不要太擠
+        'font-size': '28px',   
+        'padding': '12px 10px' 
     }
     styler = df.style.set_properties(**properties)
     
@@ -82,13 +82,14 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
 # ==========================================
 # APP 介面
 # ==========================================
-tab1, tab2, tab3 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨抗性防禦", "⚔️ 3. DPS計算"])
+# ★★★ 修改處：新增 Tab 4 ★★★
+tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 攻擊輸出", "🛡️ 2. 防禦抗性", "⚔️ 3. DPS 計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
 # 功能 1：Att.xlsx
 # -------------------------------------------------------------------------
 with tab1:
-    st.header("極巨對戰輸出計算")
+    st.header("攻擊輸出計算機")
     df_att, chart_att, err = load_data_and_chart("Att.xlsx")
 
     if err:
@@ -127,7 +128,6 @@ with tab1:
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="輸出", ascending=False)
-                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df)
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
@@ -138,7 +138,7 @@ with tab1:
 # 功能 2：Def.xlsx
 # -------------------------------------------------------------------------
 with tab2:
-    st.header("極巨對戰防禦計算")
+    st.header("防禦抗性計算機")
     df_def, chart_def, err = load_data_and_chart("Def.xlsx")
 
     if err:
@@ -175,7 +175,6 @@ with tab2:
                 
                 res_df = pd.DataFrame(results).sort_values(by="防禦", ascending=False)
                 res_df = res_df[["寶可夢", "自身屬性", "防禦"]]
-                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df, float_cols={'防禦': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
@@ -183,10 +182,10 @@ with tab2:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 3：DPS.xlsx (修改處：欄位順序調換、字體加大)
+# 功能 3：DPS.xlsx
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS 計算")
+    st.header("DPS 輸出計算機")
     df_dps, chart_dps, err = load_data_and_chart("DPS.xlsx")
 
     if err:
@@ -226,16 +225,56 @@ with tab3:
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
-                
-                # -------------------------------------------
-                # ★★★ 修改處：重新排列欄位順序 ★★★
-                # 順序變更為：屬性 -> 倍率 -> DPS -> 寶可夢
-                # -------------------------------------------
                 res_df = res_df[["屬性", "倍率", "DPS", "寶可夢"]]
-                
-                # 套用樣式 (大字體)
                 styled_df = apply_style(res_df, float_cols={'DPS': '{:.2f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
             except Exception as e:
                 st.error(f"計算錯誤: {e}")
+
+# -------------------------------------------------------------------------
+# 功能 4：屬性克制表 (新增功能)
+# -------------------------------------------------------------------------
+with tab4:
+    st.header("屬性克制表查詢")
+    
+    # 這裡我們重複利用 DPS.xlsx 裡的克制表 (因為克制表都是一樣的)
+    # 如果還沒讀取過，就讀一次
+    if 'chart_dps' not in locals() or chart_dps is None:
+        _, chart_dps, err = load_data_and_chart("DPS.xlsx")
+    
+    if chart_dps is not None:
+        c1, c2 = st.columns(2)
+        with c1:
+            types = list(chart_dps.columns)
+            chart_t1 = st.selectbox("防守方屬性 1", types, key="chart_t1")
+        with c2:
+            chart_t2 = st.selectbox("防守方屬性 2", ["無"] + types, key="chart_t2")
+            
+        if st.button("計算攻擊倍率", key="btn_chart"):
+            chart_results = []
+            
+            # 遍歷每一個「攻擊屬性」(也就是表格的 Index)
+            for atk_type in chart_dps.index:
+                # 排除一些非屬性的列 (防呆)
+                if atk_type in ["攻/守", "無", "DPS"]: continue
+                
+                mult = get_multiplier(chart_dps, atk_type, chart_t1, chart_t2)
+                
+                chart_results.append({
+                    "屬性": atk_type,
+                    "倍率": f"x{round(mult, 3)}", # 顯示格式與 Tab3 一致
+                    "數值倍率": mult # 用於排序用，不顯示
+                })
+            
+            # 排序：倍率由大到小
+            res_chart = pd.DataFrame(chart_results).sort_values(by="數值倍率", ascending=False)
+            
+            # 選取顯示欄位 (第一欄:屬性 / 第二欄:倍率)
+            res_chart = res_chart[["屬性", "倍率"]]
+            
+            # 套用樣式 (大字體、靠左)
+            styled_chart = apply_style(res_chart)
+            st.dataframe(styled_chart, use_container_width=True, hide_index=True)
+    else:
+        st.error("無法讀取屬性克制表，請檢查 DPS.xlsx 檔案。")
