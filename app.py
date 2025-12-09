@@ -230,7 +230,7 @@ with tab3:
 # 功能 4：屬性克制表
 # -------------------------------------------------------------------------
 with tab4:
-    st.header("屬性克制表查詢")
+    st.header("屬性克制表")
     
     if 'chart_dps' not in locals() or chart_dps is None:
         _, chart_dps, err = load_data_and_chart("DPS.xlsx")
@@ -268,4 +268,4 @@ with tab4:
             styled_chart = apply_style(res_chart)
             st.dataframe(styled_chart, use_container_width=True, hide_index=True)
     else:
-        st.error("無法讀取屬性克制表，請檢查 DPS.xlsx 檔案。")
+        st.error("無法讀取屬性克制表，請聯絡eltons0803@gmail.com")
