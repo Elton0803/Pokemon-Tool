@@ -220,7 +220,7 @@ with tab2:
                 res_df = pd.DataFrame(results).sort_values(by="綜合耐久", ascending=False)
                 
                 # 顯示欄位
-                res_df = res_df[["寶可夢", "自身屬性", "承受倍率", "綜合耐久"]]
+                res_df = res_df[["寶可夢", "自身屬性", "綜合耐久"]]
                 
                 styled_df = apply_style(res_df, float_cols={'綜合耐久': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
