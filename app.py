@@ -1,4 +1,3 @@
-#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
@@ -25,7 +24,7 @@ def apply_style(df, float_cols=None):
     return styler
 
 # ==========================================
-# 資料
+# 資料讀取 (修正重複索引問題)
 # ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
@@ -36,6 +35,7 @@ def load_data_and_chart(filename):
         
         split_col_idx = -1
         chart_header_row = 0
+        # 自動偵測分割點
         for r in range(min(5, len(df_raw))):
             for c in range(len(df_raw.columns)):
                 val = str(df_raw.iloc[r, c]).strip()
@@ -48,14 +48,21 @@ def load_data_and_chart(filename):
         if split_col_idx == -1:
             return None, None, "⚠️ 無法自動偵測「屬性克制表」位置"
 
+        # 左邊：寶可夢數據
         df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx))
         df_data = df_data.dropna(how='all')
 
+        # 右邊：屬性相剋表
         df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]))
         
+        # 設定索引為第一欄 (通常是屬性名稱)
         df_chart = df_chart.set_index(df_chart.columns[0])
         df_chart = df_chart.dropna(how='all')
         
+        # [修正 Bug] 去除重複的索引
+        # 因為很多寶可夢屬性相同，會導致索引有重複的 "一般", "水" 等，這會讓 .loc 查詢失敗
+        df_chart = df_chart[~df_chart.index.duplicated(keep='first')]
+
         return df_data, df_chart, None
 
     except Exception as e:
@@ -63,20 +70,27 @@ def load_data_and_chart(filename):
 
 def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     try:
-        atk, d1 = str(atk_type).strip(), str(def_type1).strip()
+        atk = str(atk_type).strip()
+        d1 = str(def_type1).strip()
         
         if not atk or atk == "nan": return 1.0
+        if not d1 or d1 == "nan": return 1.0
         
+        # 確保屬性在表格索引中
         if atk not in chart.index: return 1.0
         
+        # 查詢倍率: chart.loc[攻擊方, 防守方]
         mult1 = float(chart.loc[atk, d1]) if d1 in chart.columns else 1.0
+        
         mult2 = 1.0
-        if def_type2 and str(def_type2) != "無":
+        if def_type2 and str(def_type2) != "無" and str(def_type2) != "nan":
             d2 = str(def_type2).strip()
             if d2 in chart.columns:
                 mult2 = float(chart.loc[atk, d2])
+                
         return mult1 * mult2
-    except:
+    except Exception:
+        # 發生錯誤時回傳 1.0 避免程式崩潰
         return 1.0
 
 # ==========================================
@@ -85,7 +99,7 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
 tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨對戰防禦", "⚔️ 3. DPS計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
-# 功能區1：Att.xlsx
+# 功能區1：Att.xlsx (攻擊)
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
@@ -117,6 +131,8 @@ with tab1:
 
                     stab_bonus = 1.2 if 'Y' in stab else 1.0
                     move_power = 450 if 'G' in g_mode else 350
+                    
+                    # 攻擊邏輯: (我方屬性, 對手屬性)
                     mult = get_multiplier(chart_att, atk_type, def_t1, def_t2)
                     final_dmg = base_atk * stab_bonus * move_power * mult
                     
@@ -142,17 +158,21 @@ with tab1:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 2：Def.xlsx
+# 功能 2：Def.xlsx (防禦 - 已修正邏輯)
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
+    # 說明：這裡計算的是「綜合耐久」，數值越高越能扛
+    st.caption("數值計算說明：綜合耐久 = 基礎耐久值 / 屬性剋制倍率")
+    
     df_def, chart_def, err = load_data_and_chart("Def.xlsx")
 
     if err:
         st.error(err)
     elif df_def is not None:
+        # 取得有效的攻擊屬性列表
         atk_types = list(chart_def.index)
-        valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() != "" and str(t) != "nan" and str(t) != "攻/守"]
+        valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
         
         user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
 
@@ -163,28 +183,46 @@ with tab2:
             try:
                 for idx, row in df_def.iterrows():
                     name = row.get('寶可夢') or row.iloc[0]
-                    my_t1 = row.get('屬性1') or row.get('屬性')
-                    my_t2 = row.get('屬性2')
-                    base_def = row.get('防禦', 0)
+                    # 嘗試抓取各種可能的屬性欄位名稱
+                    my_t1 = row.get('屬性1') or row.get('屬性') or row.get('屬性一')
+                    my_t2 = row.get('屬性2') or row.get('屬性二')
+                    
+                    # 讀取基礎防禦/耐久
+                    base_def = row.get('基礎防禦') or row.get('防禦', 0)
                     
                     if pd.isna(base_def): continue
 
+                    # 防禦邏輯：
+                    # 我們要計算「對手打我」痛不痛。
+                    # get_multiplier(chart, 攻擊方, 防守方)
+                    # 攻擊方 = user_atk (對手)
+                    # 防守方 = my_t1 (我)
                     dmg_mult = get_multiplier(chart_def, user_atk, my_t1, my_t2)
                     
                     if dmg_mult == 0:
-                        final_def = 999999.9 
+                        # 免疫傷害 (倍率0)，防禦力視為極高
+                        final_def = 9999.9 
+                        dmg_mult_str = "免疫 (x0)"
                     else:
+                        # 實際防禦分數 = 基礎值 / 被打倍率
+                        # 被打倍率越高(如x2.56)，分數越低
                         final_def = base_def / dmg_mult
+                        dmg_mult_str = f"x{round(dmg_mult, 2)}"
 
                     results.append({
                         "寶可夢": name,
-                        "自身屬性": f"{my_t1}" + (f"/{my_t2}" if pd.notna(my_t2) and my_t2 != "無" else ""),
-                        "防禦": final_def
+                        "自身屬性": f"{my_t1}" + (f"/{my_t2}" if pd.notna(my_t2) and str(my_t2) != "無" else ""),
+                        "承受倍率": dmg_mult_str,
+                        "綜合耐久": final_def  # 改名以符合實際意義
                     })
                 
-                res_df = pd.DataFrame(results).sort_values(by="防禦", ascending=False)
-                res_df = res_df[["寶可夢", "自身屬性", "防禦"]]
-                styled_df = apply_style(res_df, float_cols={'防禦': '{:.1f}'})
+                # 按照綜合耐久由高到低排序
+                res_df = pd.DataFrame(results).sort_values(by="綜合耐久", ascending=False)
+                
+                # 顯示欄位
+                res_df = res_df[["寶可夢", "自身屬性", "承受倍率", "綜合耐久"]]
+                
+                styled_df = apply_style(res_df, float_cols={'綜合耐久': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
             except Exception as e:
@@ -215,6 +253,8 @@ with tab3:
                 for idx, row in df_dps.iterrows():
                     name = row.get('寶可夢') or row.iloc[0]
                     atk_type = row.get('屬性') or row.get('招式屬性')
+                    
+                    # 如果找不到屬性欄位，嘗試從索引對照
                     if not atk_type:
                         for col in row.index:
                             if str(row[col]) in chart_dps.index:
@@ -229,12 +269,11 @@ with tab3:
                     results.append({
                         "寶可夢": name,
                         "屬性": atk_type,
-                        "倍率": f"x{round(mult, 3)}", 
                         "DPS": final_dps
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
-                res_df = res_df[["屬性", "倍率", "DPS", "寶可夢"]]
+                res_df = res_df[["寶可夢", "屬性", "DPS"]]
                 styled_df = apply_style(res_df, float_cols={'DPS': '{:.2f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
@@ -242,7 +281,7 @@ with tab3:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 4：屬性克制表 (上方大圖 + 文字列表)
+# 功能 4：屬性克制表
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表")
@@ -253,9 +292,10 @@ with tab4:
     elif os.path.exists("chart.jpg"):
         st.image("chart.jpg", caption="屬性克制表", use_container_width=True)
     
-    st.divider() # 分隔線
+    st.divider() 
     st.subheader("屬性弱點計算器")
 
+    # 嘗試重用 Tab3 的表格資料，如果不存在則重新讀取
     if 'chart_dps' not in locals() or chart_dps is None:
         _, chart_dps, err = load_data_and_chart("DPS.xlsx")
     
@@ -295,4 +335,4 @@ with tab4:
                 hide_index=True
             )
     else:
-        st.error("無法讀取屬性克制表，請聯絡eltons0803@gmail.com")
+        st.error("無法讀取屬性克制表，請聯絡管理員")
