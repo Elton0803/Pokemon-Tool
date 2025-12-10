@@ -1,3 +1,4 @@
+#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
@@ -24,7 +25,7 @@ def apply_style(df, float_cols=None):
     return styler
 
 # ==========================================
-# 資料讀取 (修正重複索引問題)
+# 資料讀取
 # ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
@@ -162,15 +163,13 @@ with tab1:
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    # 說明：這裡計算的是「綜合耐久」，數值越高越能扛
-    st.caption("數值計算說明：綜合耐久 = 基礎耐久值 / 屬性剋制倍率")
+    st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
     
     df_def, chart_def, err = load_data_and_chart("Def.xlsx")
 
     if err:
         st.error(err)
     elif df_def is not None:
-        # 取得有效的攻擊屬性列表
         atk_types = list(chart_def.index)
         valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
         
@@ -183,29 +182,21 @@ with tab2:
             try:
                 for idx, row in df_def.iterrows():
                     name = row.get('寶可夢') or row.iloc[0]
-                    # 嘗試抓取各種可能的屬性欄位名稱
                     my_t1 = row.get('屬性1') or row.get('屬性') or row.get('屬性一')
                     my_t2 = row.get('屬性2') or row.get('屬性二')
                     
-                    # 讀取基礎防禦/耐久
                     base_def = row.get('基礎防禦') or row.get('防禦', 0)
                     
                     if pd.isna(base_def): continue
 
-                    # 防禦邏輯：
-                    # 我們要計算「對手打我」痛不痛。
-                    # get_multiplier(chart, 攻擊方, 防守方)
-                    # 攻擊方 = user_atk (對手)
-                    # 防守方 = my_t1 (我)
                     dmg_mult = get_multiplier(chart_def, user_atk, my_t1, my_t2)
                     
                     if dmg_mult == 0:
-                        # 免疫傷害 (倍率0)，防禦力視為極高
-                        final_def = 9999.9 
+
+                        final_def = 999.9 
                         dmg_mult_str = "免疫 (x0)"
                     else:
-                        # 實際防禦分數 = 基礎值 / 被打倍率
-                        # 被打倍率越高(如x2.56)，分數越低
+                        
                         final_def = base_def / dmg_mult
                         dmg_mult_str = f"x{round(dmg_mult, 2)}"
 
@@ -213,16 +204,14 @@ with tab2:
                         "寶可夢": name,
                         "自身屬性": f"{my_t1}" + (f"/{my_t2}" if pd.notna(my_t2) and str(my_t2) != "無" else ""),
                         "承受倍率": dmg_mult_str,
-                        "綜合耐久": final_def  # 改名以符合實際意義
+                        "坦度": final_def
                     })
                 
-                # 按照綜合耐久由高到低排序
-                res_df = pd.DataFrame(results).sort_values(by="綜合耐久", ascending=False)
+                res_df = pd.DataFrame(results).sort_values(by="坦度", ascending=False)
                 
-                # 顯示欄位
-                res_df = res_df[["寶可夢", "自身屬性", "綜合耐久"]]
+                res_df = res_df[["寶可夢", "自身屬性", "坦度"]]
                 
-                styled_df = apply_style(res_df, float_cols={'綜合耐久': '{:.1f}'})
+                styled_df = apply_style(res_df, float_cols={'坦度': '{:.1f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
             except Exception as e:
