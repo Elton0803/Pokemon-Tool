@@ -49,19 +49,14 @@ def load_data_and_chart(filename):
         if split_col_idx == -1:
             return None, None, "⚠️ 無法自動偵測「屬性克制表」位置"
 
-        # 左邊：寶可夢數據
         df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx))
         df_data = df_data.dropna(how='all')
 
-        # 右邊：屬性相剋表
         df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]))
         
-        # 設定索引為第一欄 (通常是屬性名稱)
         df_chart = df_chart.set_index(df_chart.columns[0])
         df_chart = df_chart.dropna(how='all')
         
-        # [修正 Bug] 去除重複的索引
-        # 因為很多寶可夢屬性相同，會導致索引有重複的 "一般", "水" 等，這會讓 .loc 查詢失敗
         df_chart = df_chart[~df_chart.index.duplicated(keep='first')]
 
         return df_data, df_chart, None
@@ -77,10 +72,8 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
         if not atk or atk == "nan": return 1.0
         if not d1 or d1 == "nan": return 1.0
         
-        # 確保屬性在表格索引中
         if atk not in chart.index: return 1.0
         
-        # 查詢倍率: chart.loc[攻擊方, 防守方]
         mult1 = float(chart.loc[atk, d1]) if d1 in chart.columns else 1.0
         
         mult2 = 1.0
@@ -91,7 +84,6 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
                 
         return mult1 * mult2
     except Exception:
-        # 發生錯誤時回傳 1.0 避免程式崩潰
         return 1.0
 
 # ==========================================
@@ -104,6 +96,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極�
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
+    st.caption("數值計算說明：輸出 = 攻擊 * 屬修 * 350(極巨) or 450(超極巨)")
     df_att, chart_att, err = load_data_and_chart("Att.xlsx")
 
     if err:
@@ -243,7 +236,6 @@ with tab3:
                     name = row.get('寶可夢') or row.iloc[0]
                     atk_type = row.get('屬性') or row.get('招式屬性')
                     
-                    # 如果找不到屬性欄位，嘗試從索引對照
                     if not atk_type:
                         for col in row.index:
                             if str(row[col]) in chart_dps.index:
@@ -284,7 +276,6 @@ with tab4:
     st.divider() 
     st.subheader("屬性弱點計算器")
 
-    # 嘗試重用 Tab3 的表格資料，如果不存在則重新讀取
     if 'chart_dps' not in locals() or chart_dps is None:
         _, chart_dps, err = load_data_and_chart("DPS.xlsx")
     
@@ -324,4 +315,4 @@ with tab4:
                 hide_index=True
             )
     else:
-        st.error("無法讀取屬性克制表，請聯絡管理員")
+        st.error("無法讀取屬性克制表，請聯絡eltons0803@gmail.com")
