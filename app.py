@@ -228,13 +228,12 @@ with tab3:
                     
                     results.append({
                         "寶可夢": name,
-                        "屬性": atk_type,
-                        "倍率": f"x{round(mult, 3)}", 
+                        "屬性": atk_type, 
                         "DPS": final_dps
                     })
                 
                 res_df = pd.DataFrame(results).sort_values(by="DPS", ascending=False)
-                res_df = res_df[["屬性", "倍率", "DPS", "寶可夢"]]
+                res_df = res_df[["寶可夢", "屬性", "DPS"]]
                 styled_df = apply_style(res_df, float_cols={'DPS': '{:.2f}'})
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
                 
@@ -242,7 +241,7 @@ with tab3:
                 st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 4：屬性克制表 (上方大圖 + 文字列表)
+# 功能 4：屬性克制表
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表")
