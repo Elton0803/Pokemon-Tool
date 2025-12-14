@@ -6,6 +6,10 @@ import os
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
 st.title("Pokémon GO攻防計算")
 
+if st.sidebar.button("🔄 重新讀取 Excel 資料"):
+    st.cache_data.clear()
+    st.rerun()
+
 def apply_style(df, float_cols=None):
     properties = {
         'text-align': 'left',  
@@ -27,7 +31,7 @@ def apply_style(df, float_cols=None):
 # ==========================================
 # 資料讀取 (包含去除重複索引修復)
 # ==========================================
-@st.cache_data  # 加入快取，讓切換 Tab 時不用重新讀檔，速度更快
+#@st.cache_data  # 加入快取，讓切換 Tab 時不用重新讀檔，速度更快
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
         return None, None, f"❌ 找不到檔案：{filename}"
