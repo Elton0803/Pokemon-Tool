@@ -6,10 +6,6 @@ import os
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
 st.title("Pokémon GO攻防計算")
 
-if st.sidebar.button("🔄 重新讀取 Excel 資料"):
-    st.cache_data.clear()
-    st.rerun()
-
 def apply_style(df, float_cols=None):
     properties = {
         'text-align': 'left',  
