@@ -2,33 +2,9 @@
 import streamlit as st
 import pandas as pd
 import os
-import time
 
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
 st.title("Pokémon GO攻防計算")
-
-# ==========================================
-# 側邊欄：強制更新與檔案狀態
-# ==========================================
-if st.sidebar.button("🔄 強制重新讀取 Excel 資料"):
-    st.cache_data.clear()
-    st.rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.caption("檔案狀態：")
-
-def get_file_status(filename):
-    if os.path.exists(filename):
-        mod_time = os.path.getmtime(filename)
-        # 轉換時間格式
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mod_time))
-        return f"✅ {filename}\n(更新: {time_str})"
-    else:
-        return f"❌ 找不到 {filename}"
-
-st.sidebar.text(get_file_status("Att.xlsx"))
-st.sidebar.text(get_file_status("Def.xlsx"))
-st.sidebar.text(get_file_status("DPS.xlsx"))
 
 # ==========================================
 # 樣式設定
@@ -52,18 +28,19 @@ def apply_style(df, float_cols=None):
     return styler
 
 # ==========================================
-# 資料讀取
+# 資料讀取函數 (無快取，確保每次重跑都讀最新)
 # ==========================================
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
         return None, None, f"❌ 找不到檔案：{filename}"
 
     try:
-        # 強制讀取，不使用 cache，確保更新
-        df_raw = pd.read_excel(filename, header=None)
+        # 強制使用 openpyxl 引擎讀取
+        df_raw = pd.read_excel(filename, header=None, engine='openpyxl')
         
         split_col_idx = -1
         chart_header_row = 0
+        
         # 自動偵測分割點
         for r in range(min(5, len(df_raw))):
             for c in range(len(df_raw.columns)):
@@ -77,10 +54,10 @@ def load_data_and_chart(filename):
         if split_col_idx == -1:
             return None, None, "⚠️ 無法自動偵測「屬性克制表」位置"
 
-        df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx))
+        df_data = pd.read_excel(filename, header=chart_header_row, usecols=range(0, split_col_idx), engine='openpyxl')
         df_data = df_data.dropna(how='all')
 
-        df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]))
+        df_chart = pd.read_excel(filename, header=chart_header_row, usecols=range(split_col_idx, df_raw.shape[1]), engine='openpyxl')
         
         df_chart = df_chart.set_index(df_chart.columns[0])
         df_chart = df_chart.dropna(how='all')
@@ -106,7 +83,7 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
         mult1 = float(chart.loc[atk, d1]) if d1 in chart.columns else 1.0
         
         mult2 = 1.0
-        if def_type2 and str(def_type2) != "無" and str(def_type2) != "nan":
+        if def_type2 and str(def_type2) not in ["無", "nan", "None"]:
             d2 = str(def_type2).strip()
             if d2 in chart.columns:
                 mult2 = float(chart.loc[atk, d2])
@@ -116,21 +93,28 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
         return 1.0
 
 # ==========================================
-# 介面
+# 核心邏輯：在建立 Tabs 之前，先讀取所有資料
+# 這樣確保變數是最新的，且所有 Tabs 都能共用
+# ==========================================
+data_att, chart_att, err_att = load_data_and_chart("Att.xlsx")
+data_def, chart_def, err_def = load_data_and_chart("Def.xlsx")
+data_dps, chart_dps, err_dps = load_data_and_chart("DPS.xlsx")
+
+# ==========================================
+# 介面分頁
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs(["🔥 1. 極巨攻擊輸出", "🛡️ 2. 極巨對戰防禦", "⚔️ 3. DPS計算", "📊 4. 屬性克制表"])
 
 # -------------------------------------------------------------------------
-# 功能區1：Att.xlsx (攻擊)
+# Tab 1: Att.xlsx
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
     st.caption("數值計算說明：輸出 = 攻擊 * 屬修 * 350(極巨) or 450(超極巨)")
-    df_att, chart_att, err = load_data_and_chart("Att.xlsx")
 
-    if err:
-        st.error(err)
-    elif df_att is not None:
+    if err_att:
+        st.error(err_att)
+    elif data_att is not None:
         c1, c2 = st.columns(2)
         with c1:
             types = list(chart_att.columns)
@@ -138,11 +122,12 @@ with tab1:
         with c2:
             def_t2 = st.selectbox("對手(防守方)屬性 2", ["無"] + types, key="att_t2")
 
-        df_att.columns = df_att.columns.str.strip()
+        # 自動計算
+        data_att.columns = data_att.columns.str.strip()
         results = []
         
         try:
-            for idx, row in df_att.iterrows():
+            for idx, row in data_att.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
                 atk_type = row.get('屬性')
                 stab = str(row.get('屬修', 'N')).upper()
@@ -154,7 +139,6 @@ with tab1:
                 stab_bonus = 1.2 if 'Y' in stab else 1.0
                 move_power = 450 if 'G' in g_mode else 350
                 
-                # 攻擊邏輯: (我方屬性, 對手屬性)
                 mult = get_multiplier(chart_att, atk_type, def_t1, def_t2)
                 final_dmg = base_atk * stab_bonus * move_power * mult
                 
@@ -168,10 +152,7 @@ with tab1:
             
             if not res_df.empty:
                 max_dmg = res_df["輸出"].max()
-                if max_dmg > 0:
-                    res_df["強度%"] = (res_df["輸出"] / max_dmg) * 100
-                else:
-                    res_df["強度%"] = 0.0
+                res_df["強度%"] = (res_df["輸出"] / max_dmg * 100) if max_dmg > 0 else 0.0
 
             styled_df = apply_style(res_df, float_cols={'強度%': '{:.1f}%'})
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
@@ -180,27 +161,26 @@ with tab1:
             st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 2：Def.xlsx (防禦)
+# Tab 2: Def.xlsx
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
     st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
     
-    df_def, chart_def, err = load_data_and_chart("Def.xlsx")
-
-    if err:
-        st.error(err)
-    elif df_def is not None:
+    if err_def:
+        st.error(err_def)
+    elif data_def is not None:
         atk_types = list(chart_def.index)
         valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
         
         user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
 
-        df_def.columns = df_def.columns.str.strip()
+        # 自動計算
+        data_def.columns = data_def.columns.str.strip()
         results = []
         
         try:
-            for idx, row in df_def.iterrows():
+            for idx, row in data_def.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
                 my_t1 = row.get('屬性1') or row.get('屬性') or row.get('屬性一')
                 my_t2 = row.get('屬性2') or row.get('屬性二')
@@ -226,7 +206,6 @@ with tab2:
                 })
             
             res_df = pd.DataFrame(results).sort_values(by="坦度", ascending=False)
-            
             res_df = res_df[["寶可夢", "自身屬性", "承受倍率", "坦度"]]
             
             styled_df = apply_style(res_df, float_cols={'坦度': '{:.1f}'})
@@ -236,15 +215,14 @@ with tab2:
             st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 3：DPS.xlsx
+# Tab 3: DPS.xlsx
 # -------------------------------------------------------------------------
 with tab3:
     st.header("DPS計算")
-    df_dps, chart_dps, err = load_data_and_chart("DPS.xlsx")
-
-    if err:
-        st.error(err)
-    elif df_dps is not None:
+    
+    if err_dps:
+        st.error(err_dps)
+    elif data_dps is not None:
         c1, c2 = st.columns(2)
         with c1:
             types = list(chart_dps.columns)
@@ -252,12 +230,12 @@ with tab3:
         with c2:
             dps_t2 = st.selectbox("對手(防守方)屬性 2", ["無"] + types, key="dps_t2")
 
-
-        df_dps.columns = df_dps.columns.str.strip()
+        # 自動計算
+        data_dps.columns = data_dps.columns.str.strip()
         results = []
         
         try:
-            for idx, row in df_dps.iterrows():
+            for idx, row in data_dps.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
                 atk_type = row.get('屬性') or row.get('招式屬性')
                 
@@ -287,7 +265,7 @@ with tab3:
             st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# 功能 4：屬性克制表
+# Tab 4: 屬性克制表
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表")
@@ -301,9 +279,7 @@ with tab4:
     st.divider() 
     st.subheader("屬性弱點計算器")
 
-    if 'chart_dps' not in locals() or chart_dps is None:
-        _, chart_dps, err = load_data_and_chart("DPS.xlsx")
-    
+    # 直接使用開頭讀好的 chart_dps，不再重複讀取
     if chart_dps is not None:
         c1, c2 = st.columns(2)
         with c1:
@@ -312,13 +288,13 @@ with tab4:
         with c2:
             chart_t2 = st.selectbox("防守方屬性 2", ["無"] + types, key="chart_t2")
             
+        # 自動計算
         chart_results = []
         
         for atk_type in chart_dps.index:
             if pd.isna(atk_type): continue
             atk_str = str(atk_type).strip()
-            if atk_str == "" or atk_str == "nan": continue
-            if atk_str in ["攻/守", "無", "DPS", "寶可夢"]: continue
+            if atk_str in ["", "nan", "攻/守", "無", "DPS", "寶可夢"]: continue
             
             mult = get_multiplier(chart_dps, atk_type, chart_t1, chart_t2)
 
@@ -332,11 +308,6 @@ with tab4:
         res_chart = res_chart[["屬性", "倍率"]] 
         
         styled_chart = apply_style(res_chart)
-        
-        st.dataframe(
-            styled_chart, 
-            use_container_width=True, 
-            hide_index=True
-        )
+        st.dataframe(styled_chart, use_container_width=True, hide_index=True)
     else:
         st.error("無法讀取屬性克制表，請來信eltons0803@gmail.com")
