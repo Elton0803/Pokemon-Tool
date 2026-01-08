@@ -1,3 +1,4 @@
+#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
@@ -350,4 +351,4 @@ with tab5:
                 else:
                     st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
         else:
-            st.error("list.xlsx 格式錯誤，找不到名稱或屬性欄位")
+            st.error("發生錯誤，請來信eltons0803@gmail.com")
