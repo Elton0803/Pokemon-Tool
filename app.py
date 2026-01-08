@@ -2,53 +2,16 @@
 import streamlit as st
 import pandas as pd
 import os
-import time
 
-# 設定網頁標題與佈局 (initial_sidebar_state="collapsed" 預設收起側邊欄)
+# 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
 st.title("Pokémon GO攻防計算")
-
-# ==========================================
-# 頂部：檔案管理 (取代原本的側邊欄)
-# ==========================================
-with st.expander("📁 資料來源管理 (點擊展開/收合)", expanded=False):
-    st.info("若檔案有更新，請直接在此上傳新檔。")
-    
-    # 使用 4 欄排列上傳按鈕，節省空間
-    uc1, uc2, uc3, uc4 = st.columns(4)
-    with uc1: uploaded_att = st.file_uploader("上傳 Att.xlsx (攻擊)", type=['xlsx'])
-    with uc2: uploaded_def = st.file_uploader("上傳 Def.xlsx (防禦)", type=['xlsx'])
-    with uc3: uploaded_dps = st.file_uploader("上傳 DPS.xlsx (DPS)", type=['xlsx'])
-    with uc4: uploaded_list = st.file_uploader("上傳 list.xlsx (搜尋清單)", type=['xlsx'])
-
-    # 檔案狀態顯示
-    def get_file_info(uploaded_file, local_filename):
-        """判斷是使用上傳檔案還是本地檔案，並回傳物件與訊息"""
-        if uploaded_file is not None:
-            return uploaded_file, f"🟢 使用上傳的 {local_filename}"
-        elif os.path.exists(local_filename):
-            mod_time = os.path.getmtime(local_filename)
-            time_str = time.strftime('%H:%M:%S', time.localtime(mod_time))
-            return local_filename, f"🟠 本地檔 ({time_str})"
-        else:
-            return None, f"❌ 找不到 {local_filename}"
-
-    file_att, msg_att = get_file_info(uploaded_att, "Att.xlsx")
-    file_def, msg_def = get_file_info(uploaded_def, "Def.xlsx")
-    file_dps, msg_dps = get_file_info(uploaded_dps, "DPS.xlsx")
-    file_list, msg_list = get_file_info(uploaded_list, "list.xlsx")
-    
-    # 顯示狀態文字
-    st.caption(f"{msg_att} | {msg_def} | {msg_dps} | {msg_list}")
-
-    if st.button("🔄 清除快取並重整"):
-        st.cache_data.clear()
-        st.rerun()
 
 # ==========================================
 # 輔助函數：樣式與計算
 # ==========================================
 def apply_style(df, float_cols=None):
+    """設定表格樣式 (字體放大、左對齊)"""
     properties = {'text-align': 'left', 'font-size': '28px', 'padding': '12px 10px'}
     styler = df.style.set_properties(**properties)
     styler = styler.set_table_styles([{'selector': 'th', 'props': [('text-align', 'left'), ('font-size', '28px'), ('padding-left', '10px')]}])
@@ -57,11 +20,13 @@ def apply_style(df, float_cols=None):
             if col in df.columns: styler = styler.format({col: fmt})      
     return styler
 
-def load_data_and_chart(file_obj):
-    """讀取複雜格式 (左資料、右圖表) 的 Excel"""
-    if file_obj is None: return None, None, "❌ 未提供檔案"
+def load_data_and_chart(filename):
+    """讀取複雜格式 (左資料、右圖表) 的 Excel 本地檔案"""
+    if not os.path.exists(filename):
+        return None, None, f"❌ 找不到檔案: {filename} (請確認檔案位於同一資料夾)"
+        
     try:
-        df_raw = pd.read_excel(file_obj, header=None, engine='openpyxl')
+        df_raw = pd.read_excel(filename, header=None, engine='openpyxl')
         split_col_idx = -1; chart_header_row = 0
         
         # 自動偵測分割點
@@ -84,11 +49,13 @@ def load_data_and_chart(file_obj):
         return df_data, df_chart, None
     except Exception as e: return None, None, f"讀取錯誤: {str(e)}"
 
-def load_simple_list(file_obj):
-    """讀取簡單格式 (清單) 的 Excel"""
-    if file_obj is None: return None, "❌ 未提供檔案"
+def load_simple_list(filename):
+    """讀取簡單格式 (清單) 的 Excel 本地檔案"""
+    if not os.path.exists(filename):
+        return None, f"❌ 找不到檔案: {filename}"
+        
     try:
-        df = pd.read_excel(file_obj, engine='openpyxl')
+        df = pd.read_excel(filename, engine='openpyxl')
         df.columns = df.columns.str.strip()
         df = df.dropna(how='all')
         return df, None
@@ -109,12 +76,12 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     except: return 1.0
 
 # ==========================================
-# 程式啟動：讀取所有資料
+# 程式啟動：直接讀取本地檔案
 # ==========================================
-data_att, chart_att, err_att = load_data_and_chart(file_att)
-data_def, chart_def, err_def = load_data_and_chart(file_def)
-data_dps, chart_dps, err_dps = load_data_and_chart(file_dps)
-data_list, err_list = load_simple_list(file_list)
+data_att, chart_att, err_att = load_data_and_chart("Att.xlsx")
+data_def, chart_def, err_def = load_data_and_chart("Def.xlsx")
+data_dps, chart_dps, err_dps = load_data_and_chart("DPS.xlsx")
+data_list, err_list = load_simple_list("list.xlsx")
 
 # ==========================================
 # 介面分頁
@@ -220,12 +187,11 @@ with tab2:
 
         except Exception as e:
             st.error(f"計算錯誤: {e}")
-
 # -------------------------------------------------------------------------
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算 (自選屬性)")
+    st.header("DPS計算")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
         c1, c2 = st.columns(2)
@@ -296,7 +262,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="請輸入寶可夢",
+                    placeholder="例如: 噴火龍...",
                 )
             
             if target_poke:
@@ -341,7 +307,7 @@ with tab5:
                             final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
                             final_show = final_show.sort_values("DPS", ascending=False).head(50)
                             
-                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 ")
+                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
                             final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
                             st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
                         else:
