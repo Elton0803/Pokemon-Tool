@@ -257,7 +257,7 @@ with tab4:
 # Tab 5: Search & DPS (極速優化版)
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("戰術分析 (指定對手)")
+    st.header("攻擊排行")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
@@ -276,7 +276,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="例如: 噴火龍...",
+                    placeholder="請輸入寶可夢",
                 )
             
             if target_poke:
