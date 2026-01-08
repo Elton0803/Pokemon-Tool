@@ -262,7 +262,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="例如: 噴火龍...",
+                    placeholder="輸入寶可夢名稱",
                 )
             
             if target_poke:
