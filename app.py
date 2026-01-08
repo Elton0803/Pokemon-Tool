@@ -123,7 +123,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 戰術分析(依名稱)"
+    "🔍 5. 團體戰打手查詢"
 ])
 
 # -------------------------------------------------------------------------
@@ -277,7 +277,7 @@ with tab4:
 # Tab 5: Search & DPS (極速優化版)
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("戰術分析 (指定對手)")
+    st.header("團體戰輸出排行")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
@@ -295,7 +295,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="例如: 噴火龍...",
+                    placeholder="請輸入寶可夢",
                 )
             
             if target_poke:
@@ -340,7 +340,7 @@ with tab5:
                             final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
                             final_show = final_show.sort_values("DPS", ascending=False).head(50)
                             
-                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
+                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 ")
                             final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
                             st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
                         else:
