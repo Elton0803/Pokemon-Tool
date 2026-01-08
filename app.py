@@ -254,7 +254,7 @@ with tab4:
         st.dataframe(apply_style(res_df), use_container_width=True, hide_index=True)
 
 # -------------------------------------------------------------------------
-# Tab 5: Search & DPS (模仿 Tab 3 介面)
+# Tab 5: Search & DPS (極速優化版)
 # -------------------------------------------------------------------------
 with tab5:
     st.header("戰術分析 (指定對手)")
@@ -271,7 +271,6 @@ with tab5:
         if col_name and col_t1:
             poke_list = data_list[col_name].astype(str).unique().tolist()
             
-            # 使用 container 讓選擇區塊更明顯
             with st.container():
                 target_poke = st.selectbox(
                     "請選擇對手寶可夢：", 
@@ -287,38 +286,69 @@ with tab5:
                 t2 = str(row[col_t2]).strip() if col_t2 and pd.notna(row[col_t2]) else "無"
                 if t2 == "nan": t2 = "無"
                 
-                # 顯示資訊 (類似 Tab 3 的 Selectbox 顯示，但這裡是唯讀的資訊)
                 c1, c2 = st.columns(2)
-                with c1: 
-                    st.info(f"對手屬性 1： **{t1}**")
-                with c2: 
-                    st.info(f"對手屬性 2： **{t2}**")
+                with c1: st.info(f"對手屬性 1： **{t1}**")
+                with c2: st.info(f"對手屬性 2： **{t2}**")
                 
-                # 3. DPS 計算 (邏輯完全同 Tab 3)
+                # 3. DPS 計算 (優化重點：預先計算倍率表 + 向量化)
                 if data_dps is not None and chart_dps is not None:
-                    dps_results = []
                     try:
-                        for _, d_row in data_dps.iterrows():
-                            atk_name = d_row.get('寶可夢') or d_row.iloc[0]
-                            atk_type = d_row.get('屬性') or d_row.get('招式屬性')
-                            if not atk_type: 
-                                for col in d_row.index: 
-                                    if str(d_row[col]) in chart_dps.index: atk_type = d_row[col]; break
-                            
-                            base_dps = d_row.get('DPS') or d_row.get('基礎DPS')
-                            
-                            if pd.notna(base_dps) and atk_type:
-                                mult = get_multiplier(chart_dps, atk_type, t1, t2)
-                                dps_results.append({
-                                    "寶可夢": atk_name, 
-                                    "屬性": atk_type, 
-                                    "DPS": base_dps * mult
-                                })
+                        # --- [優化步驟 A] 預先計算所有屬性對目標的倍率 ---
+                        # 這樣就不用跑迴圈查幾千次表，只要查 18 次就好
+                        type_mult_map = {}
+                        valid_types = [t for t in chart_dps.index if pd.notna(t) and str(t).strip() not in ["","nan","攻/守"]]
                         
-                        # 顯示表格 (同 Tab 3 格式)
-                        st.subheader(f"⚔️ 針對「{target_poke}」的打手排行")
-                        dps_df = pd.DataFrame(dps_results).sort_values("DPS", ascending=False)
-                        st.dataframe(apply_style(dps_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
+                        for atk_t in valid_types:
+                            type_mult_map[str(atk_t)] = get_multiplier(chart_dps, atk_t, t1, t2)
+                        
+                        # --- [優化步驟 B] 準備資料 (建立副本以免影響原始檔) ---
+                        # 假設 '屬性' 欄位名稱可能不統一，這裡做一次標準化處理
+                        dps_df_calc = data_dps.copy()
+                        
+                        # 嘗試找出正確的屬性欄位 (優先找 '屬性' 或 '招式屬性')
+                        type_col = None
+                        possible_cols = ['屬性', '招式屬性', 'Type', 'Move Type']
+                        for c in possible_cols:
+                            if c in dps_df_calc.columns:
+                                type_col = c; break
+                        
+                        # 如果找不到標準欄位，才勉強用迴圈找 (相容性)
+                        if type_col is None:
+                            # 這是最慢的情況，但只會執行一次來建立新欄位
+                            def find_type_in_row(r):
+                                for c in r.index:
+                                    val = str(r[c])
+                                    if val in type_mult_map: return val
+                                return None
+                            dps_df_calc['__CalcType__'] = dps_df_calc.apply(find_type_in_row, axis=1)
+                            type_col = '__CalcType__'
+                        
+                        # --- [優化步驟 C] 向量化計算 ---
+                        # 直接將倍率 Map 到整個欄位 (速度極快)
+                        dps_df_calc['__Mult__'] = dps_df_calc[type_col].astype(str).map(type_mult_map).fillna(1.0)
+                        
+                        # 找出 DPS 欄位
+                        dps_val_col = 'DPS' if 'DPS' in dps_df_calc.columns else ('基礎DPS' if '基礎DPS' in dps_df_calc.columns else None)
+                        
+                        if dps_val_col:
+                            # 整欄相乘
+                            dps_df_calc['對戰DPS'] = dps_df_calc[dps_val_col] * dps_df_calc['__Mult__']
+                            
+                            # 整理顯示結果
+                            name_col = '寶可夢' if '寶可夢' in dps_df_calc.columns else dps_df_calc.columns[0]
+                            
+                            final_show = dps_df_calc[[name_col, type_col, '對戰DPS', '__Mult__']].copy()
+                            final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率'] # 重新命名方便閱讀
+                            final_show = final_show.sort_values("DPS", ascending=False).head(50) # 只取前50名，減輕渲染負擔
+                            
+                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
+                            
+                            # 格式化顯示 (倍率顯示為 x1.6)
+                            final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
+                            
+                            st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
+                        else:
+                            st.error("找不到 DPS 數值欄位")
 
                     except Exception as e:
                         st.error(f"DPS 計算發生錯誤: {e}")
