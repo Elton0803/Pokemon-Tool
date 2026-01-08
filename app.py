@@ -128,7 +128,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 搜尋查詢"
+    "🔍 5. 戰術分析(依名稱)"
 ])
 
 # -------------------------------------------------------------------------
@@ -204,7 +204,7 @@ with tab2:
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算")
+    st.header("DPS計算 (自選屬性)")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
         c1, c2 = st.columns(2)
@@ -254,14 +254,14 @@ with tab4:
         st.dataframe(apply_style(res_df), use_container_width=True, hide_index=True)
 
 # -------------------------------------------------------------------------
-# Tab 5: 搜尋與自動 DPS 計算
+# Tab 5: Search & DPS (模仿 Tab 3 介面)
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("寶可夢戰術分析")
+    st.header("戰術分析 (指定對手)")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
-        # 1. 準備下拉選單
+        # 1. 搜尋輸入區
         col_name, col_t1, col_t2 = None, None, None
         for col in data_list.columns:
             if "名" in col: col_name = col
@@ -270,72 +270,59 @@ with tab5:
             
         if col_name and col_t1:
             poke_list = data_list[col_name].astype(str).unique().tolist()
-            target_poke = st.selectbox(
-                "請輸入對手寶可夢名稱：", 
-                options=poke_list,
-                index=None, 
-                placeholder="例如: 噴火...",
-            )
+            
+            # 使用 container 讓選擇區塊更明顯
+            with st.container():
+                target_poke = st.selectbox(
+                    "請選擇對手寶可夢：", 
+                    options=poke_list,
+                    index=None, 
+                    placeholder="例如: 噴火龍...",
+                )
             
             if target_poke:
-                # 2. 抓取該寶可夢的資料 (包含屬性)
+                # 2. 自動抓取屬性
                 row = data_list[data_list[col_name] == target_poke].iloc[0]
                 t1 = str(row[col_t1]).strip()
                 t2 = str(row[col_t2]).strip() if col_t2 and pd.notna(row[col_t2]) else "無"
                 if t2 == "nan": t2 = "無"
                 
-                # 顯示基本資料
-                st.success(f"🎯 目標鎖定：**{target_poke}** (屬性：{t1}" + (f" / {t2}" if t2 != "無" else "") + ")")
+                # 顯示資訊 (類似 Tab 3 的 Selectbox 顯示，但這裡是唯讀的資訊)
+                c1, c2 = st.columns(2)
+                with c1: 
+                    st.info(f"對手屬性 1： **{t1}**")
+                with c2: 
+                    st.info(f"對手屬性 2： **{t2}**")
                 
-                st.divider()
-                
-                # 3. 自動計算 DPS (把這隻寶可夢當成對手)
+                # 3. DPS 計算 (邏輯完全同 Tab 3)
                 if data_dps is not None and chart_dps is not None:
-                    st.subheader(f"⚔️ 攻擊「{target_poke}」的最佳打手 (Top 10)")
-                    
                     dps_results = []
                     try:
-                        # 遍歷 DPS 資料表中的每一隻打手
                         for _, d_row in data_dps.iterrows():
-                            # 抓打手名字
                             atk_name = d_row.get('寶可夢') or d_row.iloc[0]
-                            # 抓打手屬性 (或是招式屬性)
                             atk_type = d_row.get('屬性') or d_row.get('招式屬性')
-                            # 如果沒直接寫屬性，嘗試從欄位名稱推敲 (相容舊格式)
                             if not atk_type: 
                                 for col in d_row.index: 
                                     if str(d_row[col]) in chart_dps.index: atk_type = d_row[col]; break
                             
                             base_dps = d_row.get('DPS') or d_row.get('基礎DPS')
                             
-                            # 如果資料完整，開始計算傷害
                             if pd.notna(base_dps) and atk_type:
-                                # 核心公式：基礎DPS * 屬性表倍率(打手屬性 vs 目標屬性1 & 2)
                                 mult = get_multiplier(chart_dps, atk_type, t1, t2)
-                                final_dps = base_dps * mult
-                                
                                 dps_results.append({
-                                    "打手寶可夢": atk_name, 
-                                    "招式/屬性": atk_type, 
-                                    "對戰DPS": final_dps,
-                                    "屬性倍率": f"x{round(mult, 2)}"
+                                    "寶可夢": atk_name, 
+                                    "屬性": atk_type, 
+                                    "DPS": base_dps * mult
                                 })
                         
-                        # 排序並取出前 10 名
-                        dps_df = pd.DataFrame(dps_results).sort_values("對戰DPS", ascending=False).head(10)
-                        
-                        # 顯示表格
-                        st.dataframe(apply_style(dps_df, {'對戰DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
-                        
-                        # 額外功能：同步到 Tab 3 (選用)
-                        if st.button("👉 將此屬性帶入 [Tab 3. DPS計算] 做詳細設定"):
-                            st.session_state['dps_t1'] = t1
-                            st.session_state['dps_t2'] = t2
-                            st.info(f"已設定 Tab 3 的對手屬性為：{t1} / {t2}，請切換分頁查看。")
+                        # 顯示表格 (同 Tab 3 格式)
+                        st.subheader(f"⚔️ 針對「{target_poke}」的打手排行")
+                        dps_df = pd.DataFrame(dps_results).sort_values("DPS", ascending=False)
+                        st.dataframe(apply_style(dps_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
 
                     except Exception as e:
                         st.error(f"DPS 計算發生錯誤: {e}")
                 else:
-                    st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算剋星。")
+                    st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
         else:
-            st.error("list.xlsx 找不到對應的名稱或屬性欄位")
+            st.error("list.xlsx 格式錯誤，找不到名稱或屬性欄位")
