@@ -3,51 +3,46 @@ import pandas as pd
 import os
 import time
 
-# 設定網頁標題與佈局
-st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide")
+# 設定網頁標題與佈局 (initial_sidebar_state="collapsed" 預設收起側邊欄)
+st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
 st.title("Pokémon GO攻防計算")
 
 # ==========================================
-# 側邊欄：檔案管理與上傳
+# 頂部：檔案管理 (取代原本的側邊欄)
 # ==========================================
-st.sidebar.header("📁 資料來源管理")
-st.sidebar.info("若檔案有更新，請直接在此上傳新檔，或按下方按鈕重整。")
+with st.expander("📁 資料來源管理 (點擊展開/收合)", expanded=False):
+    st.info("若檔案有更新，請直接在此上傳新檔。")
+    
+    # 使用 4 欄排列上傳按鈕，節省空間
+    uc1, uc2, uc3, uc4 = st.columns(4)
+    with uc1: uploaded_att = st.file_uploader("上傳 Att.xlsx (攻擊)", type=['xlsx'])
+    with uc2: uploaded_def = st.file_uploader("上傳 Def.xlsx (防禦)", type=['xlsx'])
+    with uc3: uploaded_dps = st.file_uploader("上傳 DPS.xlsx (DPS)", type=['xlsx'])
+    with uc4: uploaded_list = st.file_uploader("上傳 list.xlsx (搜尋清單)", type=['xlsx'])
 
-# 建立上傳器
-uploaded_att = st.sidebar.file_uploader("上傳 Att.xlsx (攻擊)", type=['xlsx'])
-uploaded_def = st.sidebar.file_uploader("上傳 Def.xlsx (防禦)", type=['xlsx'])
-uploaded_dps = st.sidebar.file_uploader("上傳 DPS.xlsx (DPS)", type=['xlsx'])
-uploaded_list = st.sidebar.file_uploader("上傳 list.xlsx (搜尋清單)", type=['xlsx'])
+    # 檔案狀態顯示
+    def get_file_info(uploaded_file, local_filename):
+        """判斷是使用上傳檔案還是本地檔案，並回傳物件與訊息"""
+        if uploaded_file is not None:
+            return uploaded_file, f"🟢 使用上傳的 {local_filename}"
+        elif os.path.exists(local_filename):
+            mod_time = os.path.getmtime(local_filename)
+            time_str = time.strftime('%H:%M:%S', time.localtime(mod_time))
+            return local_filename, f"🟠 本地檔 ({time_str})"
+        else:
+            return None, f"❌ 找不到 {local_filename}"
 
-st.sidebar.markdown("---")
-st.sidebar.caption("檔案讀取狀態：")
+    file_att, msg_att = get_file_info(uploaded_att, "Att.xlsx")
+    file_def, msg_def = get_file_info(uploaded_def, "Def.xlsx")
+    file_dps, msg_dps = get_file_info(uploaded_dps, "DPS.xlsx")
+    file_list, msg_list = get_file_info(uploaded_list, "list.xlsx")
+    
+    # 顯示狀態文字
+    st.caption(f"{msg_att} | {msg_def} | {msg_dps} | {msg_list}")
 
-def get_file_info(uploaded_file, local_filename):
-    """判斷是使用上傳檔案還是本地檔案，並回傳物件與訊息"""
-    if uploaded_file is not None:
-        return uploaded_file, f"🟢 使用上傳的 {local_filename}"
-    elif os.path.exists(local_filename):
-        mod_time = os.path.getmtime(local_filename)
-        time_str = time.strftime('%H:%M:%S', time.localtime(mod_time))
-        return local_filename, f"🟠 本地檔 ({time_str})"
-    else:
-        return None, f"❌ 找不到 {local_filename}"
-
-# 取得檔案來源
-file_att, msg_att = get_file_info(uploaded_att, "Att.xlsx")
-file_def, msg_def = get_file_info(uploaded_def, "Def.xlsx")
-file_dps, msg_dps = get_file_info(uploaded_dps, "DPS.xlsx")
-file_list, msg_list = get_file_info(uploaded_list, "list.xlsx")
-
-# 顯示狀態
-st.sidebar.text(msg_att)
-st.sidebar.text(msg_def)
-st.sidebar.text(msg_dps)
-st.sidebar.text(msg_list)
-
-if st.sidebar.button("🔄 清除快取並重整"):
-    st.cache_data.clear()
-    st.rerun()
+    if st.button("🔄 清除快取並重整"):
+        st.cache_data.clear()
+        st.rerun()
 
 # ==========================================
 # 輔助函數：樣式與計算
@@ -257,11 +252,10 @@ with tab4:
 # Tab 5: Search & DPS (極速優化版)
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("攻擊排行")
+    st.header("戰術分析 (指定對手)")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
-        # 1. 搜尋輸入區
         col_name, col_t1, col_t2 = None, None, None
         for col in data_list.columns:
             if "名" in col: col_name = col
@@ -276,11 +270,10 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="請輸入寶可夢",
+                    placeholder="例如: 噴火龍...",
                 )
             
             if target_poke:
-                # 2. 自動抓取屬性
                 row = data_list[data_list[col_name] == target_poke].iloc[0]
                 t1 = str(row[col_t1]).strip()
                 t2 = str(row[col_t2]).strip() if col_t2 and pd.notna(row[col_t2]) else "無"
@@ -290,66 +283,43 @@ with tab5:
                 with c1: st.info(f"對手屬性 1： **{t1}**")
                 with c2: st.info(f"對手屬性 2： **{t2}**")
                 
-                # 3. DPS 計算 (優化重點：預先計算倍率表 + 向量化)
                 if data_dps is not None and chart_dps is not None:
                     try:
-                        # --- [優化步驟 A] 預先計算所有屬性對目標的倍率 ---
-                        # 這樣就不用跑迴圈查幾千次表，只要查 18 次就好
+                        # 優化版 DPS 計算
                         type_mult_map = {}
                         valid_types = [t for t in chart_dps.index if pd.notna(t) and str(t).strip() not in ["","nan","攻/守"]]
-                        
                         for atk_t in valid_types:
                             type_mult_map[str(atk_t)] = get_multiplier(chart_dps, atk_t, t1, t2)
                         
-                        # --- [優化步驟 B] 準備資料 (建立副本以免影響原始檔) ---
-                        # 假設 '屬性' 欄位名稱可能不統一，這裡做一次標準化處理
                         dps_df_calc = data_dps.copy()
-                        
-                        # 嘗試找出正確的屬性欄位 (優先找 '屬性' 或 '招式屬性')
                         type_col = None
                         possible_cols = ['屬性', '招式屬性', 'Type', 'Move Type']
                         for c in possible_cols:
-                            if c in dps_df_calc.columns:
-                                type_col = c; break
+                            if c in dps_df_calc.columns: type_col = c; break
                         
-                        # 如果找不到標準欄位，才勉強用迴圈找 (相容性)
                         if type_col is None:
-                            # 這是最慢的情況，但只會執行一次來建立新欄位
                             def find_type_in_row(r):
                                 for c in r.index:
-                                    val = str(r[c])
-                                    if val in type_mult_map: return val
+                                    if str(r[c]) in type_mult_map: return str(r[c])
                                 return None
                             dps_df_calc['__CalcType__'] = dps_df_calc.apply(find_type_in_row, axis=1)
                             type_col = '__CalcType__'
                         
-                        # --- [優化步驟 C] 向量化計算 ---
-                        # 直接將倍率 Map 到整個欄位 (速度極快)
                         dps_df_calc['__Mult__'] = dps_df_calc[type_col].astype(str).map(type_mult_map).fillna(1.0)
-                        
-                        # 找出 DPS 欄位
                         dps_val_col = 'DPS' if 'DPS' in dps_df_calc.columns else ('基礎DPS' if '基礎DPS' in dps_df_calc.columns else None)
                         
                         if dps_val_col:
-                            # 整欄相乘
                             dps_df_calc['對戰DPS'] = dps_df_calc[dps_val_col] * dps_df_calc['__Mult__']
-                            
-                            # 整理顯示結果
                             name_col = '寶可夢' if '寶可夢' in dps_df_calc.columns else dps_df_calc.columns[0]
-                            
                             final_show = dps_df_calc[[name_col, type_col, '對戰DPS', '__Mult__']].copy()
-                            final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率'] # 重新命名方便閱讀
-                            final_show = final_show.sort_values("DPS", ascending=False).head(50) # 只取前50名，減輕渲染負擔
+                            final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
+                            final_show = final_show.sort_values("DPS", ascending=False).head(50)
                             
                             st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
-                            
-                            # 格式化顯示 (倍率顯示為 x1.6)
                             final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
-                            
                             st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
                         else:
                             st.error("找不到 DPS 數值欄位")
-
                     except Exception as e:
                         st.error(f"DPS 計算發生錯誤: {e}")
                 else:
