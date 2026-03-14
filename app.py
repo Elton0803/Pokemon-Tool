@@ -1,15 +1,13 @@
+#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
-import time
+
 
 # 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
 st.title("Pokémon GO攻防計算")
 
-# ==========================================
-# 天氣加成設定字典
-# ==========================================
 weather_boost = {
     "無": [],
     "晴朗": ["草", "火", "地面"],
@@ -114,7 +112,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 戰術分析(依名稱)"
+    "🔍 5. 團體戰打手查詢"
 ])
 
 # -------------------------------------------------------------------------
@@ -160,7 +158,7 @@ with tab1:
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    st.caption("數值越高越坦 (綜合耐久 = 基礎防禦 / 最終承受倍率)。若對手受天氣加成，承受傷害會變高。")
+    st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
     if err_def: st.error(err_def)
     elif data_def is not None:
         valid_atks = [t for t in chart_def.index if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
@@ -198,7 +196,7 @@ with tab2:
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算 (自選屬性)")
+    st.header("DPS計算")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
         c1, c2 = st.columns(2)
@@ -257,7 +255,7 @@ with tab4:
 # Tab 5: Search & DPS (極速優化版)
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("戰術分析 (指定對手)")
+    st.header("團體戰輸出排行")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
@@ -275,7 +273,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="例如: 噴火龍...",
+                    placeholder="請輸入寶可夢",
                 )
             
             if target_poke:
@@ -333,4 +331,4 @@ with tab5:
                 else:
                     st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
         else:
-            st.error("list.xlsx 格式錯誤，找不到名稱或屬性欄位")
+            st.error("發生錯誤，請來信eltons0803@gmail.com")
