@@ -99,7 +99,7 @@ data_list, err_list = load_simple_list("list.xlsx")
 c_empty, c_weather = st.columns([5, 1])
 with c_weather:
     current_weather = st.selectbox(
-        "🌤️ 全域天氣設定", 
+        "🌤️ 天氣加成", 
         ["無", "晴朗", "雨天", "多雲", "陰天", "強風", "下雪", "起霧"],
         index=0
     )
