@@ -158,7 +158,8 @@ with tab1:
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
+    # 移除天氣加成相關的敘述
+    st.caption("數值越高越坦 (綜合耐久 = 基礎防禦 / 屬性克制倍率)。")
     if err_def: st.error(err_def)
     elif data_def is not None:
         valid_atks = [t for t in chart_def.index if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
@@ -173,14 +174,11 @@ with tab2:
                 base_def = row.get('基礎防禦') or row.get('防禦', 0)
                 if pd.isna(base_def): continue
                 
-                # 計算：屬性倍率 * 對手的天氣倍率 (對手變痛 = 我們坦度變低)
+                # 計算：只取原生屬性克制倍率，無視天氣
                 mult = get_multiplier(chart_def, user_atk, t1, t2)
-                w_mult = get_weather_mult(user_atk, current_weather)
-                final_dmg_mult = mult * w_mult
                 
-                final_def = 999.9 if final_dmg_mult == 0 else base_def / final_dmg_mult
-                mult_str = "免疫" if final_dmg_mult == 0 else f"x{round(final_dmg_mult, 2)}"
-                if w_mult > 1.0 and final_dmg_mult != 0: mult_str += " (天氣加強)"
+                final_def = 999.9 if mult == 0 else base_def / mult
+                mult_str = "免疫" if mult == 0 else f"x{round(mult, 2)}"
                 
                 results.append({
                     "寶可夢": name, 
@@ -191,7 +189,7 @@ with tab2:
             res_df = pd.DataFrame(results).sort_values("坦度", ascending=False)
             st.dataframe(apply_style(res_df, {'坦度': '{:.1f}'}), use_container_width=True, hide_index=True)
         except Exception as e: st.error(f"計算錯誤: {e}")
-
+        
 # -------------------------------------------------------------------------
 # Tab 3: DPS
 # -------------------------------------------------------------------------
