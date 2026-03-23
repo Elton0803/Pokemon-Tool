@@ -2,29 +2,48 @@
 import streamlit as st
 import pandas as pd
 import os
+import time
 
-
-# 設定網頁標題與佈局
+# 設定網頁標題與佈局 (initial_sidebar_state="collapsed" 預設收起側邊欄)
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
 st.title("Pokémon GO攻防計算")
 
-weather_boost = {
-    "無": [],
-    "晴朗": ["草", "火", "地面"],
-    "雨天": ["水", "電", "蟲"],
-    "多雲": ["一般", "岩石"],
-    "陰天": ["妖精", "格鬥", "毒"],
-    "強風": ["飛行", "龍", "超能力"],
-    "下雪": ["冰", "鋼"],
-    "起霧": ["惡", "幽靈"]
-}
+# ==========================================
+# 頂部：檔案管理 (取代原本的側邊欄)
+# ==========================================
+with st.expander("📁 資料來源管理 (點擊展開/收合)", expanded=False):
+    st.info("若檔案有更新，請直接在此上傳新檔。")
+    
+    # 使用 4 欄排列上傳按鈕，節省空間
+    uc1, uc2, uc3, uc4 = st.columns(4)
+    with uc1: uploaded_att = st.file_uploader("上傳 Att.xlsx (攻擊)", type=['xlsx'])
+    with uc2: uploaded_def = st.file_uploader("上傳 Def.xlsx (防禦)", type=['xlsx'])
+    with uc3: uploaded_dps = st.file_uploader("上傳 DPS.xlsx (DPS)", type=['xlsx'])
+    with uc4: uploaded_list = st.file_uploader("上傳 list.xlsx (搜尋清單)", type=['xlsx'])
 
-def get_weather_mult(atk_type, weather):
-    """判斷該屬性在當下天氣是否有 1.2 倍加成"""
-    if not atk_type or pd.isna(atk_type): return 1.0
-    if str(atk_type).strip() in weather_boost.get(weather, []):
-        return 1.2
-    return 1.0
+    # 檔案狀態顯示
+    def get_file_info(uploaded_file, local_filename):
+        """判斷是使用上傳檔案還是本地檔案，並回傳物件與訊息"""
+        if uploaded_file is not None:
+            return uploaded_file, f"🟢 使用上傳的 {local_filename}"
+        elif os.path.exists(local_filename):
+            mod_time = os.path.getmtime(local_filename)
+            time_str = time.strftime('%H:%M:%S', time.localtime(mod_time))
+            return local_filename, f"🟠 本地檔 ({time_str})"
+        else:
+            return None, f"❌ 找不到 {local_filename}"
+
+    file_att, msg_att = get_file_info(uploaded_att, "Att.xlsx")
+    file_def, msg_def = get_file_info(uploaded_def, "Def.xlsx")
+    file_dps, msg_dps = get_file_info(uploaded_dps, "DPS.xlsx")
+    file_list, msg_list = get_file_info(uploaded_list, "list.xlsx")
+    
+    # 顯示狀態文字
+    st.caption(f"{msg_att} | {msg_def} | {msg_dps} | {msg_list}")
+
+    if st.button("🔄 清除快取並重整"):
+        st.cache_data.clear()
+        st.rerun()
 
 # ==========================================
 # 輔助函數：樣式與計算
@@ -38,12 +57,14 @@ def apply_style(df, float_cols=None):
             if col in df.columns: styler = styler.format({col: fmt})      
     return styler
 
-def load_data_and_chart(filename):
-    if not os.path.exists(filename):
-        return None, None, f"❌ 找不到檔案: {filename} (請確認檔案位於同一資料夾)"
+def load_data_and_chart(file_obj):
+    """讀取複雜格式 (左資料、右圖表) 的 Excel"""
+    if file_obj is None: return None, None, "❌ 未提供檔案"
     try:
-        df_raw = pd.read_excel(filename, header=None, engine='openpyxl')
+        df_raw = pd.read_excel(file_obj, header=None, engine='openpyxl')
         split_col_idx = -1; chart_header_row = 0
+        
+        # 自動偵測分割點
         for r in range(min(5, len(df_raw))):
             for c in range(len(df_raw.columns)):
                 val = str(df_raw.iloc[r, c]).strip()
@@ -59,24 +80,26 @@ def load_data_and_chart(filename):
         
         if not df_chart.empty:
             df_chart = df_chart.set_index(df_chart.columns[0]).dropna(how='all')
-            df_chart = df_chart[~df_chart.index.duplicated(keep='first')]
+            df_chart = df_chart[~df_chart.index.duplicated(keep='first')] # 去除重複索引
         return df_data, df_chart, None
     except Exception as e: return None, None, f"讀取錯誤: {str(e)}"
 
-def load_simple_list(filename):
-    if not os.path.exists(filename):
-        return None, f"❌ 找不到檔案: {filename}"
+def load_simple_list(file_obj):
+    """讀取簡單格式 (清單) 的 Excel"""
+    if file_obj is None: return None, "❌ 未提供檔案"
     try:
-        df = pd.read_excel(filename, engine='openpyxl')
+        df = pd.read_excel(file_obj, engine='openpyxl')
         df.columns = df.columns.str.strip()
         df = df.dropna(how='all')
         return df, None
     except Exception as e: return None, f"讀取錯誤: {str(e)}"
 
 def get_multiplier(chart, atk_type, def_type1, def_type2=None):
+    """查詢屬性倍率"""
     try:
         atk = str(atk_type).strip(); d1 = str(def_type1).strip()
         if not atk or atk == "nan" or not d1 or d1 == "nan" or atk not in chart.index: return 1.0
+        
         mult1 = float(chart.loc[atk, d1]) if d1 in chart.columns else 1.0
         mult2 = 1.0
         if def_type2 and str(def_type2) not in ["無", "nan", "None"]:
@@ -86,23 +109,12 @@ def get_multiplier(chart, atk_type, def_type1, def_type2=None):
     except: return 1.0
 
 # ==========================================
-# 程式啟動：讀取資料
+# 程式啟動：讀取所有資料
 # ==========================================
-data_att, chart_att, err_att = load_data_and_chart("Att.xlsx")
-data_def, chart_def, err_def = load_data_and_chart("Def.xlsx")
-data_dps, chart_dps, err_dps = load_data_and_chart("DPS.xlsx")
-data_list, err_list = load_simple_list("list.xlsx")
-
-# ==========================================
-# 全域 UI：天氣設定 (放置於分頁右上角)
-# ==========================================
-c_empty, c_weather = st.columns([5, 1])
-with c_weather:
-    current_weather = st.selectbox(
-        "🌤️ 天氣加成", 
-        ["無", "晴朗", "雨天", "多雲", "陰天", "強風", "下雪", "起霧"],
-        index=0
-    )
+data_att, chart_att, err_att = load_data_and_chart(file_att)
+data_def, chart_def, err_def = load_data_and_chart(file_def)
+data_dps, chart_dps, err_dps = load_data_and_chart(file_dps)
+data_list, err_list = load_simple_list(file_list)
 
 # ==========================================
 # 介面分頁
@@ -136,14 +148,11 @@ with tab1:
                 
                 stab_bonus = 1.2 if 'Y' in str(row.get('屬修', 'N')).upper() else 1.0
                 move_p = 450 if 'G' in str(row.get('超級巨/極巨', 'D')).upper() else 350
-                
-                # 計算：屬性倍率 * 天氣倍率
                 mult = get_multiplier(chart_att, atk_t, def_t1, def_t2)
-                w_mult = get_weather_mult(atk_t, current_weather)
                 
                 results.append({
                     "寶可夢": name, "屬性": atk_t, 
-                    "輸出": int(base_atk * stab_bonus * move_p * mult * w_mult)
+                    "輸出": int(base_atk * stab_bonus * move_p * mult)
                 })
             
             res_df = pd.DataFrame(results).sort_values("輸出", ascending=False)
@@ -154,42 +163,64 @@ with tab1:
         except Exception as e: st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# Tab 2: Def
+# Tab 2: Def.xlsx (自動更新 + 修正防禦邏輯)
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    # 移除天氣加成相關的敘述
-    st.caption("數值越高越坦 (綜合耐久 = 基礎防禦 / 屬性克制倍率)。")
-    if err_def: st.error(err_def)
-    elif data_def is not None:
-        valid_atks = [t for t in chart_def.index if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
-        user_atk = st.selectbox("對手攻擊屬性", valid_atks, key="def_atk")
+    st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
+    
+    df_def, chart_def, err = load_data_and_chart("Def.xlsx")
+
+    if err:
+        st.error(err)
+    elif df_def is not None:
+        atk_types = list(chart_def.index)
+        valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
         
-        data_def.columns = data_def.columns.str.strip()
+        user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
+
+        # --- 自動計算區 ---
+        df_def.columns = df_def.columns.str.strip()
         results = []
+        
         try:
-            for _, row in data_def.iterrows():
+            for idx, row in df_def.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
-                t1, t2 = row.get('屬性1') or row.get('屬性'), row.get('屬性2')
+                my_t1 = row.get('屬性1') or row.get('屬性') or row.get('屬性一')
+                my_t2 = row.get('屬性2') or row.get('屬性二')
+                
                 base_def = row.get('基礎防禦') or row.get('防禦', 0)
+                
                 if pd.isna(base_def): continue
+
+                dmg_mult = get_multiplier(chart_def, user_atk, my_t1, my_t2)
                 
-                # 計算：只取原生屬性克制倍率，無視天氣
-                mult = get_multiplier(chart_def, user_atk, t1, t2)
-                
-                final_def = 999.9 if mult == 0 else base_def / mult
-                mult_str = "免疫" if mult == 0 else f"x{round(mult, 2)}"
-                
+                if dmg_mult == 0:
+
+                    final_def = 999.9 
+                    dmg_mult_str = "免疫 (x0)"
+                else:
+                    
+                    final_def = base_def / dmg_mult
+                    dmg_mult_str = f"x{round(dmg_mult, 2)}"
+
                 results.append({
-                    "寶可夢": name, 
-                    "自身屬性": f"{t1}" + (f"/{t2}" if pd.notna(t2) and str(t2)!="無" else ""), 
-                    "承受倍率": mult_str, "坦度": final_def
+                    "寶可夢": name,
+                    "自身屬性": f"{my_t1}" + (f"/{my_t2}" if pd.notna(my_t2) and str(my_t2) != "無" else ""),
+                    "承受倍率": dmg_mult_str,
+                    "坦度": final_def
                 })
             
-            res_df = pd.DataFrame(results).sort_values("坦度", ascending=False)
-            st.dataframe(apply_style(res_df, {'坦度': '{:.1f}'}), use_container_width=True, hide_index=True)
-        except Exception as e: st.error(f"計算錯誤: {e}")
-        
+            res_df = pd.DataFrame(results).sort_values(by="坦度", ascending=False)
+            
+            res_df = res_df[["寶可夢", "自身屬性", "坦度"]]
+            
+            styled_df = apply_style(res_df, float_cols={'坦度': '{:.1f}'})
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.error(f"計算錯誤: {e}")
+
 # -------------------------------------------------------------------------
 # Tab 3: DPS
 # -------------------------------------------------------------------------
@@ -213,10 +244,8 @@ with tab3:
                 
                 base_dps = row.get('DPS') or row.get('基礎DPS')
                 if pd.notna(base_dps) and atk_t:
-                    # 計算：DPS * 屬性倍率 * 天氣倍率
                     mult = get_multiplier(chart_dps, atk_t, dps_t1, dps_t2)
-                    w_mult = get_weather_mult(atk_t, current_weather)
-                    results.append({"寶可夢": name, "屬性": atk_t, "DPS": base_dps * mult * w_mult})
+                    results.append({"寶可夢": name, "屬性": atk_t, "DPS": base_dps * mult})
             
             res_df = pd.DataFrame(results).sort_values("DPS", ascending=False)
             st.dataframe(apply_style(res_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
@@ -239,12 +268,8 @@ with tab4:
         chart_res = []
         for atk_t in chart_dps.index:
             if pd.isna(atk_t) or str(atk_t).strip() in ["","nan","攻/守"]: continue
-            
             mult = get_multiplier(chart_dps, atk_t, chart_t1, chart_t2)
-            w_mult = get_weather_mult(atk_t, current_weather)
-            final_mult = mult * w_mult
-            
-            chart_res.append({"屬性": str(atk_t), "倍率": f"x{round(final_mult, 3)}", "v": final_mult})
+            chart_res.append({"屬性": str(atk_t), "倍率": f"x{round(mult, 3)}", "v": mult})
             
         res_df = pd.DataFrame(chart_res).sort_values("v", ascending=False)[["屬性","倍率"]]
         st.dataframe(apply_style(res_df), use_container_width=True, hide_index=True)
@@ -286,14 +311,11 @@ with tab5:
                 
                 if data_dps is not None and chart_dps is not None:
                     try:
-                        # 優化版 DPS 計算 (融合天氣加成)
+                        # 優化版 DPS 計算
                         type_mult_map = {}
                         valid_types = [t for t in chart_dps.index if pd.notna(t) and str(t).strip() not in ["","nan","攻/守"]]
                         for atk_t in valid_types:
-                            # 基礎屬性倍率 * 天氣倍率
-                            base_mult = get_multiplier(chart_dps, atk_t, t1, t2)
-                            w_mult = get_weather_mult(atk_t, current_weather)
-                            type_mult_map[str(atk_t)] = base_mult * w_mult
+                            type_mult_map[str(atk_t)] = get_multiplier(chart_dps, atk_t, t1, t2)
                         
                         dps_df_calc = data_dps.copy()
                         type_col = None
@@ -319,7 +341,7 @@ with tab5:
                             final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
                             final_show = final_show.sort_values("DPS", ascending=False).head(50)
                             
-                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
+                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 ")
                             final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
                             st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
                         else:
