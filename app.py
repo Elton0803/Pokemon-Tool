@@ -1,13 +1,14 @@
-#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
-
 
 # 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
 st.title("Pokémon GO攻防計算")
 
+# ==========================================
+# 天氣加成設定字典
+# ==========================================
 weather_boost = {
     "無": [],
     "晴朗": ["草", "火", "地面"],
@@ -38,6 +39,11 @@ def apply_style(df, float_cols=None):
             if col in df.columns: styler = styler.format({col: fmt})      
     return styler
 
+def clean_columns(df):
+    """清除 DataFrame 中重複或無效的欄位名稱"""
+    df.columns = [str(c).strip() if pd.notna(c) else f"未命名_{i}" for i, c in enumerate(df.columns)]
+    return df.loc[:, ~df.columns.duplicated()].copy()
+
 def load_data_and_chart(filename):
     if not os.path.exists(filename):
         return None, None, f"❌ 找不到檔案: {filename} (請確認檔案位於同一資料夾)"
@@ -54,6 +60,8 @@ def load_data_and_chart(filename):
         if split_col_idx == -1: return None, None, "⚠️ 無法偵測屬性表位置"
 
         df_raw.columns = df_raw.iloc[chart_header_row]
+        df_raw = clean_columns(df_raw) # 過濾重複欄位
+        
         df_data = df_raw.iloc[chart_header_row+1:, :split_col_idx].copy().dropna(how='all')
         df_chart = df_raw.iloc[chart_header_row+1:, split_col_idx:].copy()
         
@@ -68,7 +76,7 @@ def load_simple_list(filename):
         return None, f"❌ 找不到檔案: {filename}"
     try:
         df = pd.read_excel(filename, engine='openpyxl')
-        df.columns = df.columns.str.strip()
+        df = clean_columns(df)
         df = df.dropna(how='all')
         return df, None
     except Exception as e: return None, f"讀取錯誤: {str(e)}"
@@ -99,7 +107,7 @@ data_list, err_list = load_simple_list("list.xlsx")
 c_empty, c_weather = st.columns([5, 1])
 with c_weather:
     current_weather = st.selectbox(
-        "🌤️ 天氣加成", 
+        "🌤️ 全域天氣設定", 
         ["無", "晴朗", "雨天", "多雲", "陰天", "強風", "下雪", "起霧"],
         index=0
     )
@@ -112,7 +120,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 團體戰打手查詢"
+    "🔍 5. 戰術分析(依名稱)"
 ])
 
 # -------------------------------------------------------------------------
@@ -126,18 +134,23 @@ with tab1:
         with c1: def_t1 = st.selectbox("對手屬性 1", list(chart_att.columns), key="att_t1")
         with c2: def_t2 = st.selectbox("對手屬性 2", ["無"] + list(chart_att.columns), key="att_t2")
         
-        data_att.columns = data_att.columns.str.strip()
         results = []
         try:
             for _, row in data_att.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
-                atk_t, base_atk = row.get('屬性'), row.get('基礎攻擊', 0)
-                if pd.isna(base_atk): continue
+                atk_t = row.get('屬性')
+                raw_atk = row.get('基礎攻擊', 0)
+                
+                try:
+                    base_atk = float(raw_atk)
+                except:
+                    continue
+                    
+                if pd.isna(base_atk) or base_atk <= 0: continue
                 
                 stab_bonus = 1.2 if 'Y' in str(row.get('屬修', 'N')).upper() else 1.0
                 move_p = 450 if 'G' in str(row.get('超級巨/極巨', 'D')).upper() else 350
                 
-                # 計算：屬性倍率 * 天氣倍率
                 mult = get_multiplier(chart_att, atk_t, def_t1, def_t2)
                 w_mult = get_weather_mult(atk_t, current_weather)
                 
@@ -146,84 +159,99 @@ with tab1:
                     "輸出": int(base_atk * stab_bonus * move_p * mult * w_mult)
                 })
             
-            res_df = pd.DataFrame(results).sort_values("輸出", ascending=False)
-            if not res_df.empty:
+            if results:
+                res_df = pd.DataFrame(results).sort_values("輸出", ascending=False)
                 res_df["強度%"] = (res_df["輸出"] / res_df["輸出"].max() * 100) if res_df["輸出"].max() > 0 else 0
-            
-            st.dataframe(apply_style(res_df, {'強度%': '{:.1f}%'}), use_container_width=True, hide_index=True)
+                st.dataframe(apply_style(res_df, {'強度%': '{:.1f}%'}), use_container_width=True, hide_index=True)
         except Exception as e: st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# Tab 2: Def
+# Tab 2: Def (新增開盾與血量邏輯)
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    st.caption("數值計算說明：坦度 = HP * 防禦 / 屬性剋制倍率")
-    
-    df_def, chart_def, err = load_data_and_chart("Def.xlsx")
-
-    if err:
-        st.error(err)
-    elif df_def is not None:
-        atk_types = list(chart_def.index)
-        valid_atk_types = [t for t in atk_types if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
+    st.caption("數值越高越坦 (綜合耐久 = (血量 × 基礎防禦) / 屬性克制倍率)。")
+    if err_def: st.error(err_def)
+    elif data_def is not None:
+        valid_atks = [t for t in chart_def.index if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
         
-        user_atk = st.selectbox("對手 (攻擊方) 屬性", valid_atk_types, key="def_atk")
-
-        # --- 自動計算區 ---
-        df_def.columns = df_def.columns.str.strip()
+        # UI 排版：將屬性選單跟開盾打勾放在同一行
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            user_atk = st.selectbox("對手攻擊屬性", valid_atks, key="def_atk")
+        with c2:
+            st.markdown("<div style='margin-top: 35px;'></div>", unsafe_allow_html=True) # 對齊用空白
+            use_shields = st.checkbox("🛡️ 開三盾 (每隻寶可夢血量 +180)", value=False)
+        
         results = []
-        
         try:
-            for idx, row in df_def.iterrows():
-                name = row.get('寶可夢') or row.iloc[0]
-                my_t1 = row.get('屬性1') or row.get('屬性') or row.get('屬性一')
-                my_t2 = row.get('屬性2') or row.get('屬性二')
+            for _, row in data_def.iterrows():
+                name = row.get('寶可夢', row.iloc[0])
+                t1 = row.get('屬性1', row.get('屬性'))
+                t2 = row.get('屬性2')
                 
-                base_def = row.get('基礎防禦') or row.get('防禦', 0)
+                # 取得防禦
+                raw_def = row.get('基礎防禦', row.get('防禦', 0))
+                try:
+                    base_def = float(raw_def)
+                except (ValueError, TypeError):
+                    continue
+                if pd.isna(base_def) or base_def <= 0: continue
                 
-                if pd.isna(base_def): continue
-
-                dmg_mult = get_multiplier(chart_def, user_atk, my_t1, my_t2)
+                # 取得血量 (自動尋找 血量/HP/基礎血量/體力 等欄位，若無則預設為 0)
+                raw_hp = row.get('血量', row.get('HP', row.get('基礎血量', row.get('體力', 0))))
+                try:
+                    base_hp = float(raw_hp)
+                except (ValueError, TypeError):
+                    base_hp = 0.0
+                if pd.isna(base_hp): base_hp = 0.0
                 
-                if dmg_mult == 0:
-
-                    final_def = 999.9 
-                    dmg_mult_str = "免疫 (x0)"
-                else:
-                    
-                    final_def = base_def / dmg_mult
-                    dmg_mult_str = f"x{round(dmg_mult, 2)}"
-
+                # 判斷是否開盾
+                final_hp = base_hp + 180.0 if use_shields else base_hp
+                
+                # 原屬性克制倍率
+                mult = get_multiplier(chart_def, user_atk, t1, t2)
+                
+                # 坦度計算
+                # 如果有血量(原本有提供或開了盾)，綜合耐久 = (血量 * 防禦) / 克制倍率
+                # 如果完全沒血量也沒開盾，則退回舊版算法：防禦 / 克制倍率
+                tank_stat = (final_hp * base_def) if final_hp > 0 else base_def
+                final_def = 99999.0 if mult == 0 else tank_stat / mult
+                
+                mult_str = "免疫" if mult == 0 else f"x{round(mult, 2)}"
+                t2_str = f"/{t2}" if pd.notna(t2) and str(t2).strip() not in ["", "無", "nan", "None"] else ""
+                
                 results.append({
-                    "寶可夢": name,
-                    "自身屬性": f"{my_t1}" + (f"/{my_t2}" if pd.notna(my_t2) and str(my_t2) != "無" else ""),
-                    "承受倍率": dmg_mult_str,
+                    "寶可夢": name, 
+                    "自身屬性": f"{t1}{t2_str}", 
+                    "承受倍率": mult_str, 
+                    "目前血量": int(final_hp) if final_hp > 0 else 0,
                     "坦度": final_def
                 })
             
-            res_df = pd.DataFrame(results).sort_values(by="坦度", ascending=False)
-            
-            res_df = res_df[["寶可夢", "自身屬性", "坦度"]]
-            
-            styled_df = apply_style(res_df, float_cols={'坦度': '{:.1f}'})
-            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+            if results:
+                res_df = pd.DataFrame(results).sort_values("坦度", ascending=False)
+                # 若完全沒有血量數據，可以隱藏該欄位讓畫面更乾淨
+                if res_df["目前血量"].max() == 0:
+                    res_df = res_df.drop(columns=["目前血量"])
+                    st.dataframe(apply_style(res_df, {'坦度': '{:.1f}'}), use_container_width=True, hide_index=True)
+                else:
+                    st.dataframe(apply_style(res_df, {'坦度': '{:.1f}', '目前血量': '{:.0f}'}), use_container_width=True, hide_index=True)
+            else:
+                st.warning("沒有可計算的防禦資料，請檢查 Def.xlsx 內容。")
+        except Exception as e: st.error(f"防禦計算錯誤: {e}")
 
-        except Exception as e:
-            st.error(f"計算錯誤: {e}")
-        
 # -------------------------------------------------------------------------
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算")
+    st.header("DPS計算 (自選屬性)")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
         c1, c2 = st.columns(2)
         with c1: dps_t1 = st.selectbox("對手屬性 1", list(chart_dps.columns), key="dps_t1")
         with c2: dps_t2 = st.selectbox("對手屬性 2", ["無"] + list(chart_dps.columns), key="dps_t2")
         
-        data_dps.columns = data_dps.columns.str.strip()
         results = []
         try:
             for _, row in data_dps.iterrows():
@@ -233,15 +261,20 @@ with tab3:
                     for col in row.index: 
                         if str(row[col]) in chart_dps.index: atk_t = row[col]; break
                 
-                base_dps = row.get('DPS') or row.get('基礎DPS')
-                if pd.notna(base_dps) and atk_t:
-                    # 計算：DPS * 屬性倍率 * 天氣倍率
+                raw_dps = row.get('DPS') or row.get('基礎DPS')
+                try:
+                    base_dps = float(raw_dps)
+                except:
+                    continue
+                    
+                if pd.notna(base_dps) and base_dps > 0 and atk_t:
                     mult = get_multiplier(chart_dps, atk_t, dps_t1, dps_t2)
                     w_mult = get_weather_mult(atk_t, current_weather)
                     results.append({"寶可夢": name, "屬性": atk_t, "DPS": base_dps * mult * w_mult})
             
-            res_df = pd.DataFrame(results).sort_values("DPS", ascending=False)
-            st.dataframe(apply_style(res_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
+            if results:
+                res_df = pd.DataFrame(results).sort_values("DPS", ascending=False)
+                st.dataframe(apply_style(res_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
         except Exception as e: st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
@@ -272,10 +305,10 @@ with tab4:
         st.dataframe(apply_style(res_df), use_container_width=True, hide_index=True)
 
 # -------------------------------------------------------------------------
-# Tab 5: Search & DPS (極速優化版)
+# Tab 5: Search & DPS
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("團體戰輸出排行")
+    st.header("戰術分析 (指定對手)")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
@@ -293,7 +326,7 @@ with tab5:
                     "請選擇對手寶可夢：", 
                     options=poke_list,
                     index=None, 
-                    placeholder="請輸入寶可夢",
+                    placeholder="例如: 噴火龍...",
                 )
             
             if target_poke:
@@ -308,11 +341,9 @@ with tab5:
                 
                 if data_dps is not None and chart_dps is not None:
                     try:
-                        # 優化版 DPS 計算 (融合天氣加成)
                         type_mult_map = {}
                         valid_types = [t for t in chart_dps.index if pd.notna(t) and str(t).strip() not in ["","nan","攻/守"]]
                         for atk_t in valid_types:
-                            # 基礎屬性倍率 * 天氣倍率
                             base_mult = get_multiplier(chart_dps, atk_t, t1, t2)
                             w_mult = get_weather_mult(atk_t, current_weather)
                             type_mult_map[str(atk_t)] = base_mult * w_mult
@@ -335,9 +366,11 @@ with tab5:
                         dps_val_col = 'DPS' if 'DPS' in dps_df_calc.columns else ('基礎DPS' if '基礎DPS' in dps_df_calc.columns else None)
                         
                         if dps_val_col:
+                            # 確保 DPS 是數值
+                            dps_df_calc[dps_val_col] = pd.to_numeric(dps_df_calc[dps_val_col], errors='coerce')
                             dps_df_calc['對戰DPS'] = dps_df_calc[dps_val_col] * dps_df_calc['__Mult__']
                             name_col = '寶可夢' if '寶可夢' in dps_df_calc.columns else dps_df_calc.columns[0]
-                            final_show = dps_df_calc[[name_col, type_col, '對戰DPS', '__Mult__']].copy()
+                            final_show = dps_df_calc[[name_col, type_col, '對戰DPS', '__Mult__']].copy().dropna()
                             final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
                             final_show = final_show.sort_values("DPS", ascending=False).head(50)
                             
@@ -351,4 +384,4 @@ with tab5:
                 else:
                     st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
         else:
-            st.error("發生錯誤，請來信eltons0803@gmail.com")
+            st.error("list.xlsx 格式錯誤，找不到名稱或屬性欄位")
