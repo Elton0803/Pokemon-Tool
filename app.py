@@ -1,3 +1,4 @@
+#Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
 import os
@@ -120,7 +121,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 戰術分析(依名稱)"
+    "🔍 5. 團體戰打手查詢"
 ])
 
 # -------------------------------------------------------------------------
@@ -166,11 +167,11 @@ with tab1:
         except Exception as e: st.error(f"計算錯誤: {e}")
 
 # -------------------------------------------------------------------------
-# Tab 2: Def (依據您的專屬表單更新)
+# Tab 2: Def (移除承受倍率欄位)
 # -------------------------------------------------------------------------
 with tab2:
     st.header("極巨對戰防禦計算")
-    st.caption("數值越高越坦 (綜合耐久 = 面板數值 / 屬性克制倍率)。")
+    st.caption("坦度 = HP * 防禦 / 屬性剋制倍率")
     if err_def: st.error(err_def)
     elif data_def is not None:
         valid_atks = [t for t in chart_def.index if pd.notna(t) and str(t).strip() not in ["", "nan", "攻/守"]]
@@ -180,7 +181,7 @@ with tab2:
             user_atk = st.selectbox("對手攻擊屬性", valid_atks, key="def_atk")
         with c2:
             st.markdown("<div style='margin-top: 35px;'></div>", unsafe_allow_html=True)
-            use_shields = st.checkbox("🛡️ 採用「開三盾」數據計算", value=False)
+            use_shields = st.checkbox("開三盾", value=False)
         
         results = []
         try:
@@ -189,7 +190,6 @@ with tab2:
                 t1 = row.get('屬性一', row.get('屬性1', row.get('屬性')))
                 t2 = row.get('屬性二', row.get('屬性2'))
                 
-                # 判斷要抓哪一個欄位的數值
                 if use_shields:
                     raw_stat = row.get('開三盾', 0)
                 else:
@@ -207,13 +207,11 @@ with tab2:
                 # 坦度計算
                 final_def = 99999.0 if mult == 0 else base_stat / mult
                 
-                mult_str = "免疫" if mult == 0 else f"x{round(mult, 2)}"
                 t2_str = f"/{t2}" if pd.notna(t2) and str(t2).strip() not in ["", "無", "nan", "None"] else ""
                 
                 results.append({
                     "寶可夢": name, 
                     "自身屬性": f"{t1}{t2_str}", 
-                    "承受倍率": mult_str, 
                     "坦度": final_def
                 })
             
@@ -367,4 +365,4 @@ with tab5:
                 else:
                     st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
         else:
-            st.error("list.xlsx 格式錯誤，找不到名稱或屬性欄位")
+            st.error("發生錯誤，請來信eltons0803@gmail.com")
