@@ -108,7 +108,7 @@ data_list, err_list = load_simple_list("list.xlsx")
 c_empty, c_weather = st.columns([5, 1])
 with c_weather:
     current_weather = st.selectbox(
-        "🌤️ 全域天氣設定", 
+        "🌤️ 天氣加成", 
         ["無", "晴朗", "雨天", "多雲", "陰天", "強風", "下雪", "起霧"],
         index=0
     )
@@ -226,7 +226,7 @@ with tab2:
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算 (自選屬性)")
+    st.header("DPS計算")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
         c1, c2 = st.columns(2)
@@ -289,7 +289,7 @@ with tab4:
 # Tab 5: Search & DPS
 # -------------------------------------------------------------------------
 with tab5:
-    st.header("戰術分析 (指定對手)")
+    st.header("團體戰輸出排行")
     
     if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
     elif data_list is not None:
