@@ -5,7 +5,7 @@ import os
 
 # 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
-st.title("Pokémon GO攻防計算")
+st.title("Pokémon GO攻守數據")
 
 # ==========================================
 # 天氣加成設定字典
@@ -121,7 +121,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛡️ 2. 極巨防禦", 
     "⚔️ 3. DPS計算", 
     "📊 4. 屬性克制", 
-    "🔍 5. 團體戰打手查詢"
+    "🔍 5. 團體戰輸出查詢"
 ])
 
 # -------------------------------------------------------------------------
@@ -129,6 +129,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
+    st.caption("輸出 = 攻擊 * (超極巨*450/極巨*350) * 屬修 * 屬性剋制倍率")
     if err_att: st.error(err_att)
     elif data_att is not None:
         c1, c2 = st.columns(2)
