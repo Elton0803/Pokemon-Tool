@@ -141,6 +141,16 @@ def tab_label(label, icon_filename):
     return f"![](data:image/png;base64,{encoded_icon}) {label}"
 
 
+st.html("""
+<style>
+[data-testid="stTabs"] [role="tab"] [data-testid="stMarkdownContainer"] > p {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+</style>
+""")
+
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     tab_label("1. 極巨攻擊", "max_attack.png"),
     tab_label("2. 極巨防禦", "max_defense.png"),
