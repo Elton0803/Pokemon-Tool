@@ -1,7 +1,10 @@
 #Mega快龍=Mega魯魯米
 import streamlit as st
 import pandas as pd
-import os
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parent
+DATA_DIR = APP_DIR / "data"
 
 # 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
@@ -46,10 +49,11 @@ def clean_columns(df):
     return df.loc[:, ~df.columns.duplicated()].copy()
 
 def load_data_and_chart(filename):
-    if not os.path.exists(filename):
-        return None, None, f"❌ 找不到檔案: {filename} (請確認檔案位於同一資料夾)"
+    path = DATA_DIR / filename
+    if not path.is_file():
+        return None, None, f"❌ 找不到檔案: data/{filename}"
     try:
-        df_raw = pd.read_excel(filename, header=None, engine='openpyxl')
+        df_raw = pd.read_excel(path, header=None, engine='openpyxl')
         split_col_idx = -1; chart_header_row = 0
         for r in range(min(5, len(df_raw))):
             for c in range(len(df_raw.columns)):
@@ -73,10 +77,11 @@ def load_data_and_chart(filename):
     except Exception as e: return None, None, f"讀取錯誤: {str(e)}"
 
 def load_simple_list(filename):
-    if not os.path.exists(filename):
-        return None, f"❌ 找不到檔案: {filename}"
+    path = DATA_DIR / filename
+    if not path.is_file():
+        return None, f"❌ 找不到檔案: data/{filename}"
     try:
-        df = pd.read_excel(filename, engine='openpyxl')
+        df = pd.read_excel(path, engine='openpyxl')
         df = clean_columns(df)
         df = df.dropna(how='all')
         return df, None
@@ -264,8 +269,8 @@ with tab3:
 # -------------------------------------------------------------------------
 with tab4:
     st.header("屬性克制表")
-    if os.path.exists("chart.png"): st.image("chart.png", use_container_width=True)
-    elif os.path.exists("chart.jpg"): st.image("chart.jpg", use_container_width=True)
+    if (APP_DIR / "chart.png").is_file(): st.image(APP_DIR / "chart.png", use_container_width=True)
+    elif (APP_DIR / "chart.jpg").is_file(): st.image(APP_DIR / "chart.jpg", use_container_width=True)
     
     st.divider(); st.subheader("屬性弱點計算器")
     if chart_dps is not None:
