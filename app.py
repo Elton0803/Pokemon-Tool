@@ -1,10 +1,15 @@
 #Mega快龍=Mega魯魯米
+from base64 import b64encode
+from io import BytesIO
+from pathlib import Path
+
 import streamlit as st
 import pandas as pd
-from pathlib import Path
+from PIL import Image
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
+ICON_DIR = APP_DIR / "icons"
 
 # 設定網頁標題與佈局
 st.set_page_config(page_title="Pokémon GO攻守數據", layout="wide", initial_sidebar_state="collapsed")
@@ -121,12 +126,27 @@ with c_weather:
 # ==========================================
 # 介面分頁
 # ==========================================
+@st.cache_data(show_spinner=False)
+def tab_label(label, icon_filename):
+    try:
+        with Image.open(ICON_DIR / icon_filename) as icon:
+            thumbnail = icon.convert("RGBA")
+            thumbnail.thumbnail((48, 48), Image.Resampling.LANCZOS)
+            buffer = BytesIO()
+            thumbnail.save(buffer, format="PNG")
+    except OSError:
+        return label
+
+    encoded_icon = b64encode(buffer.getvalue()).decode("ascii")
+    return f"![](data:image/png;base64,{encoded_icon}) {label}"
+
+
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🔥 1. 極巨攻擊", 
-    "🛡️ 2. 極巨防禦", 
-    "⚔️ 3. DPS計算", 
-    "📊 4. 屬性克制", 
-    "🔍 5. 團體戰輸出查詢"
+    tab_label("1. 極巨攻擊", "max_attack.png"),
+    tab_label("2. 極巨防禦", "max_defense.png"),
+    tab_label("3. DPS 計算", "dps.png"),
+    tab_label("4. 屬性克制", "type.png"),
+    tab_label("5. 團體戰輸出排行", "raid.png"),
 ])
 
 # -------------------------------------------------------------------------
