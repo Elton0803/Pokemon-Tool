@@ -152,11 +152,11 @@ st.html("""
 """)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    tab_label("1. 極巨攻擊", "max_attack.png"),
-    tab_label("2. 極巨防禦", "max_defense.png"),
-    tab_label("3. DPS 計算", "dps.png"),
-    tab_label("4. 屬性克制", "type.png"),
-    tab_label("5. 團體戰輸出排行", "raid.png"),
+    tab_label("1. 極巨攻擊", "max_attack-transparent.png"),
+    tab_label("2. 極巨防禦", "max_defense-transparent.png"),
+    tab_label("3. DPS 計算", "dps-transparent.png"),
+    tab_label("4. 屬性克制", "type-transparent.png"),
+    tab_label("5. 團體戰輸出排行", "raid-transparent.png"),
 ])
 
 # -------------------------------------------------------------------------
