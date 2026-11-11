@@ -156,7 +156,7 @@ st.html("""
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 1rem;
+    font-size: 0.875rem;
 }
 [data-testid="stTabs"] [role="tab"] [data-testid="stMarkdownContainer"] > p > img {
     max-height: 1.125rem;
