@@ -208,7 +208,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # -------------------------------------------------------------------------
 with tab1:
     st.header("極巨對戰輸出計算")
-    st.caption("輸出 = 攻擊 * (超極巨*450/極巨*350) * 屬修 * 屬性剋制倍率")
+    st.caption("輸出 = 攻擊 × 招式威力（超極巨 450、極巨 350）× 屬修 × 屬性剋制倍率 × 天氣倍率")
     if err_att: st.error(err_att)
     elif data_att is not None:
         attack_types = list(chart_att.columns)
@@ -266,7 +266,8 @@ with tab1:
                 if pd.isna(base_atk) or base_atk <= 0: continue
                 
                 stab_bonus = 1.2 if 'Y' in str(row.get('屬修', 'N')).upper() else 1.0
-                move_p = 450 if 'G' in str(row.get('超極巨/極巨', 'D')).upper() else 350
+                move_kind = row.get("超級巨/極巨", row.get("超極巨/極巨", "D"))
+                move_p = 450 if str(move_kind).strip().upper() == "G" else 350
                 
                 mult = get_multiplier(chart_att, atk_t, def_t1, def_t2)
                 w_mult = get_weather_mult(atk_t, current_weather)
