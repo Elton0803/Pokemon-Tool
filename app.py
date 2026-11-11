@@ -168,6 +168,19 @@ st.html("""
     }
     [data-testid="stTabs"] [role="tab"] {
         min-height: 44px;
+        position: relative;
+    }
+    [data-testid="stTabs"] [role="tab"] > .react-aria-SelectionIndicator {
+        visibility: hidden;
+    }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"]::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: 2px;
+        background: currentColor;
+        pointer-events: none;
     }
 }
 </style>
