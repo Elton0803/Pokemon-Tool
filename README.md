@@ -10,11 +10,10 @@
 | --- | --- | --- |
 | 極巨攻擊 | 選擇對手的一至兩種屬性。 | 比較極巨招式的輸出，並顯示相較於榜首的強度百分比。 |
 | 極巨防禦 | 選擇對手技能的**攻擊屬性**，可根據需求勾選「開三盾」。 | 根據防禦和血量數值及屬性倍率計算坦度排行。 |
-| DPS計算 | 選擇對手的一至兩種屬性。 | 以基礎 DPS 乘上屬性倍率和天氣加成，依強度排序。 |
+| DPS | 手動選擇對手屬性，或搜尋團體戰對手以自動帶入屬性。 | 依屬性倍率和天氣加成排列 DPS。選取寶可夢時顯示前 50 名。 |
 | 屬性克制 | 選擇對手的一至兩種屬性。 | 列出各攻擊屬性的倍率，由高到低排序。 |
-| 團體戰輸出查詢 | 在搜尋欄填入對手寶可夢。 | 自動帶入對手屬性，依估算 DPS 列出前 50 名打手。 |
 
-對手只有一種屬性時，第二屬性選「無」。右上角的「天氣加成」預設為「無」。選擇天氣後，符合該天氣的攻擊屬性會在極巨攻擊、DPS、屬性弱點計算器及團體戰排行套用 1.2 倍加成。
+對手只有一種屬性時，第二屬性選「無」。右上角的「天氣加成」預設為「無」。選擇天氣後，符合該天氣的攻擊屬性會在極巨攻擊、DPS 及屬性弱點計算器套用 1.2 倍加成。
 
 ## 計算方式
 
@@ -32,7 +31,7 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-開啟終端機顯示的 Local URL（通常是 `http://localhost:8501`），即可切換分頁使用。第一次可以到「團體戰輸出查詢」選取「噴火龍」，查看程式帶入的火／飛行屬性和打手排行。
+開啟終端機顯示的 Local URL（通常是 `http://localhost:8501`），即可切換分頁使用。第一次可以到「DPS」選取「噴火龍」，查看程式帶入的火／飛行屬性和打手排行。
 
 ## 資料檔
 
@@ -63,11 +62,10 @@ This Pokémon GO PvE battle calculator is built with Python and Streamlit. It us
 | --- | --- | --- |
 | Max Battle Attack (極巨攻擊) | Select one or two types for the opponent. | Compare Max Move damage output and see each result as a percentage of the highest output. |
 | Max Battle Defense (極巨防禦) | Select the type of the opponent’s attack. Enable 「開三盾」 to include three Max Guards. | Rank Pokémon by durability using their HP, Defense, and the incoming type effectiveness multiplier. |
-| DPS Calculator (DPS計算) | Select one or two types for the opponent. | Rank attackers by base DPS adjusted for type effectiveness and weather. |
+| DPS | Choose the opponent’s types manually or search for a raid opponent to fill them in. | Rank attackers by DPS adjusted for type effectiveness and weather. Selecting a Pokémon shows the top 50. |
 | Type Effectiveness (屬性克制) | Select one or two types for the opponent. | See the multipliers for each attacking type, sorted from highest to lowest. |
-| Raid Attacker Rankings (團體戰輸出查詢) | Search for the opposing Pokémon. | The calculator fills in the opponent’s types and lists the top 50 attackers by estimated DPS. |
 
-For a single-type opponent, select 「無」 (None) for the second type. The weather setting in the upper right also defaults to 「無」. When you select a weather condition, moves of boosted types receive a 1.2× multiplier in Max Battle Attack, the DPS Calculator, the type weakness calculator, and the raid rankings.
+For a single-type opponent, select 「無」 (None) for the second type. The weather setting in the upper right also defaults to 「無」. When you select a weather condition, moves of boosted types receive a 1.2× multiplier in Max Battle Attack, DPS and the type weakness calculator.
 
 ### Formulas
 
@@ -85,7 +83,7 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-Open the local URL shown in the terminal, usually `http://localhost:8501`. To try the raid rankings, open 「團體戰輸出查詢」 and select Charizard (噴火龍). The calculator fills in Fire and Flying as its types and displays the attacker rankings.
+Open the local URL shown in the terminal, usually `http://localhost:8501`. To try the raid rankings, open 「DPS」 and select Charizard (噴火龍). The calculator fills in Fire and Flying as its types and displays the attacker rankings.
 
 ### Data Files
 

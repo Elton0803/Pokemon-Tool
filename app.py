@@ -112,14 +112,14 @@ data_def, chart_def, err_def = load_data_and_chart("Def.xlsx")
 data_dps, chart_dps, err_dps = load_data_and_chart("DPS.xlsx")
 data_list, err_list = load_simple_list("list.xlsx")
 
-def apply_attack_target(target_types):
-    target = st.session_state.att_target
-    if target is not None and target_types[target] is not None:
-        st.session_state.att_t1, st.session_state.att_t2 = target_types[target]
+def apply_target_types(prefix, target_types):
+    types = target_types.get(st.session_state[f"{prefix}_target"])
+    if types is not None:
+        st.session_state[f"{prefix}_t1"], st.session_state[f"{prefix}_t2"] = types
 
 
-def clear_attack_target():
-    st.session_state.att_target = None
+def clear_target(prefix):
+    st.session_state[f"{prefix}_target"] = None
 
 
 # ==========================================
@@ -196,12 +196,11 @@ st.html("""
 </style>
 """)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     tab_label("極巨攻擊", "max_attack-transparent.png"),
     tab_label("極巨防禦", "max_defense-transparent.png", trim_padding=True),
-    tab_label("DPS 計算", "dps-transparent.png"),
+    tab_label("DPS", "raid-transparent.png"),
     tab_label("屬性克制", "type-transparent.png"),
-    tab_label("團體戰輸出排行", "raid-transparent.png"),
 ])
 
 # -------------------------------------------------------------------------
@@ -240,17 +239,17 @@ with tab1:
             index=None,
             placeholder="搜尋寶可夢",
             key="att_target",
-            on_change=apply_attack_target,
-            args=(target_types,),
+            on_change=apply_target_types,
+            args=("att", target_types),
         )
         if target is not None and target_types[target] is None:
             st.info("找不到這隻寶可夢的屬性，請用下方選單手動選擇。")
 
         c1, c2 = st.columns(2)
         with c1:
-            def_t1 = st.selectbox("對手屬性 1", attack_types, key="att_t1", on_change=clear_attack_target)
+            def_t1 = st.selectbox("對手屬性 1", attack_types, key="att_t1", on_change=clear_target, args=("att",))
         with c2:
-            def_t2 = st.selectbox("對手屬性 2", second_types, key="att_t2", on_change=clear_attack_target)
+            def_t2 = st.selectbox("對手屬性 2", second_types, key="att_t2", on_change=clear_target, args=("att",))
         
         results = []
         try:
@@ -343,19 +342,48 @@ with tab2:
 # Tab 3: DPS
 # -------------------------------------------------------------------------
 with tab3:
-    st.header("DPS計算")
+    st.header("DPS")
     if err_dps: st.error(err_dps)
     elif data_dps is not None:
+        dps_types = [type_name for type_name in chart_dps.columns if type_name != "無"]
+        dps_second_types = ["無"] + dps_types
+        raid_targets = {}
+        if data_list is not None:
+            name_col = next((col for col in data_list.columns if "名" in col), None)
+            first_col = next((col for col in data_list.columns if "屬性" in col and ("1" in col or "一" in col)), None)
+            second_col = next((col for col in data_list.columns if "屬性" in col and ("2" in col or "二" in col)), None)
+            if name_col and first_col:
+                for _, row in data_list.dropna(subset=[name_col, first_col]).iterrows():
+                    name = str(row[name_col]).strip()
+                    type1 = str(row[first_col]).strip()
+                    raw_type2 = row.get(second_col)
+                    type2 = str(raw_type2).strip() if pd.notna(raw_type2) else "無"
+                    if name and type1 in dps_types and type2 in dps_second_types:
+                        raid_targets.setdefault(name, (type1, type2))
+
+        target_poke = st.selectbox(
+            "請選擇對手寶可夢",
+            list(raid_targets),
+            index=None,
+            placeholder="搜尋團體戰對手，或直接選擇屬性",
+            key="dps_target",
+            on_change=apply_target_types,
+            args=("dps", raid_targets),
+        )
+        if not raid_targets:
+            st.info("目前無法搜尋寶可夢，請直接選擇對手屬性。")
         c1, c2 = st.columns(2)
-        with c1: dps_t1 = st.selectbox("對手屬性 1", list(chart_dps.columns), key="dps_t1")
-        with c2: dps_t2 = st.selectbox("對手屬性 2", ["無"] + list(chart_dps.columns), key="dps_t2")
+        with c1:
+            dps_t1 = st.selectbox("對手屬性 1", dps_types, key="dps_t1", on_change=clear_target, args=("dps",))
+        with c2:
+            dps_t2 = st.selectbox("對手屬性 2", dps_second_types, key="dps_t2", on_change=clear_target, args=("dps",))
         
         results = []
         try:
             for _, row in data_dps.iterrows():
                 name = row.get('寶可夢') or row.iloc[0]
-                atk_t = row.get('屬性', row.get('屬性一', row.get('招式屬性')))
-                if not atk_t: 
+                atk_t = row.get('屬性', row.get('屬性一', row.get('招式屬性', row.get('Type', row.get('Move Type')))))
+                if pd.isna(atk_t) or not atk_t:
                     for col in row.index: 
                         if str(row[col]) in chart_dps.index: atk_t = row[col]; break
                 
@@ -365,13 +393,19 @@ with tab3:
                 except:
                     continue
                     
-                if pd.notna(base_dps) and base_dps > 0 and atk_t:
+                if pd.notna(base_dps) and base_dps > 0 and pd.notna(atk_t) and atk_t:
                     mult = get_multiplier(chart_dps, atk_t, dps_t1, dps_t2)
                     w_mult = get_weather_mult(atk_t, current_weather)
-                    results.append({"寶可夢": name, "屬性": atk_t, "DPS": base_dps * mult * w_mult})
+                    result = {"寶可夢": name, "屬性": atk_t, "DPS": base_dps * mult * w_mult}
+                    if target_poke:
+                        result["倍率"] = f"x{round(mult * w_mult, 2)}"
+                    results.append(result)
             
             if results:
                 res_df = pd.DataFrame(results).sort_values("DPS", ascending=False)
+                if target_poke:
+                    st.subheader(f"「{target_poke}」的打手排行（前 50 名）")
+                    res_df = res_df.head(50)
                 st.dataframe(apply_style(res_df, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
         except Exception as e: st.error(f"計算錯誤: {e}")
 
@@ -401,85 +435,3 @@ with tab4:
             
         res_df = pd.DataFrame(chart_res).sort_values("v", ascending=False)[["屬性","倍率"]]
         st.dataframe(apply_style(res_df), use_container_width=True, hide_index=True)
-
-# -------------------------------------------------------------------------
-# Tab 5: Search & DPS
-# -------------------------------------------------------------------------
-with tab5:
-    st.header("團體戰輸出排行")
-    
-    if err_list: st.error(f"無法讀取 list.xlsx: {err_list}")
-    elif data_list is not None:
-        col_name, col_t1, col_t2 = None, None, None
-        for col in data_list.columns:
-            if "名" in col: col_name = col
-            elif "屬性" in col and ("1" in col or "一" in col): col_t1 = col
-            elif "屬性" in col and ("2" in col or "二" in col): col_t2 = col
-            
-        if col_name and col_t1:
-            poke_list = data_list[col_name].astype(str).unique().tolist()
-            
-            with st.container():
-                target_poke = st.selectbox(
-                    "請選擇對手寶可夢：", 
-                    options=poke_list,
-                    index=None, 
-                    placeholder="例如: 噴火龍...",
-                )
-            
-            if target_poke:
-                row = data_list[data_list[col_name] == target_poke].iloc[0]
-                t1 = str(row[col_t1]).strip()
-                t2 = str(row[col_t2]).strip() if col_t2 and pd.notna(row[col_t2]) else "無"
-                if t2 == "nan": t2 = "無"
-                
-                c1, c2 = st.columns(2)
-                with c1: st.info(f"對手屬性 1： **{t1}**")
-                with c2: st.info(f"對手屬性 2： **{t2}**")
-                
-                if data_dps is not None and chart_dps is not None:
-                    try:
-                        type_mult_map = {}
-                        valid_types = [t for t in chart_dps.index if pd.notna(t) and str(t).strip() not in ["","nan","攻/守"]]
-                        for atk_t in valid_types:
-                            base_mult = get_multiplier(chart_dps, atk_t, t1, t2)
-                            w_mult = get_weather_mult(atk_t, current_weather)
-                            type_mult_map[str(atk_t)] = base_mult * w_mult
-                        
-                        dps_df_calc = data_dps.copy()
-                        type_col = None
-                        possible_cols = ['屬性', '招式屬性', 'Type', 'Move Type']
-                        for c in possible_cols:
-                            if c in dps_df_calc.columns: type_col = c; break
-                        
-                        if type_col is None:
-                            def find_type_in_row(r):
-                                for c in r.index:
-                                    if str(r[c]) in type_mult_map: return str(r[c])
-                                return None
-                            dps_df_calc['__CalcType__'] = dps_df_calc.apply(find_type_in_row, axis=1)
-                            type_col = '__CalcType__'
-                        
-                        dps_df_calc['__Mult__'] = dps_df_calc[type_col].astype(str).map(type_mult_map).fillna(1.0)
-                        dps_val_col = 'DPS' if 'DPS' in dps_df_calc.columns else ('基礎DPS' if '基礎DPS' in dps_df_calc.columns else None)
-                        
-                        if dps_val_col:
-                            # 確保 DPS 是數值
-                            dps_df_calc[dps_val_col] = pd.to_numeric(dps_df_calc[dps_val_col], errors='coerce')
-                            dps_df_calc['對戰DPS'] = dps_df_calc[dps_val_col] * dps_df_calc['__Mult__']
-                            name_col = '寶可夢' if '寶可夢' in dps_df_calc.columns else dps_df_calc.columns[0]
-                            final_show = dps_df_calc[[name_col, type_col, '對戰DPS', '__Mult__']].copy().dropna()
-                            final_show.columns = ['寶可夢', '屬性', 'DPS', '倍率']
-                            final_show = final_show.sort_values("DPS", ascending=False).head(50)
-                            
-                            st.subheader(f"⚔️ 針對「{target_poke}」的打手排行 (Top 50)")
-                            final_show['倍率'] = final_show['倍率'].apply(lambda x: f"x{round(x, 2)}")
-                            st.dataframe(apply_style(final_show, {'DPS': '{:.2f}'}), use_container_width=True, hide_index=True)
-                        else:
-                            st.error("找不到 DPS 數值欄位")
-                    except Exception as e:
-                        st.error(f"DPS 計算發生錯誤: {e}")
-                else:
-                    st.warning("⚠️ 缺少 DPS.xlsx 或屬性表，無法計算。")
-        else:
-            st.error("發生錯誤，請來信eltons0803@gmail.com")
