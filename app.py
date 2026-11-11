@@ -162,6 +162,12 @@ st.html("""
     max-height: 1.125rem;
     width: auto;
 }
+@media (max-width: 600px) {
+    [data-testid="stTabs"] [role="tab"] {
+        padding-inline: 0.5rem;
+        min-height: 44px;
+    }
+}
 </style>
 """)
 
