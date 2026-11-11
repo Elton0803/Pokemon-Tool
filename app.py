@@ -127,10 +127,19 @@ with c_weather:
 # 介面分頁
 # ==========================================
 @st.cache_data(show_spinner=False)
-def tab_label(label, icon_filename):
+def tab_label(label, icon_filename, *, trim_padding=False):
     try:
         with Image.open(ICON_DIR / icon_filename) as icon:
             thumbnail = icon.convert("RGBA")
+            if trim_padding:
+                alpha = thumbnail.getchannel("A")
+                bounds = alpha.point(lambda value: 255 if value > 32 else 0).getbbox()
+                if bounds:
+                    left, top, right, bottom = bounds
+                    margin = round(max(right - left, bottom - top) * 0.05)
+                    thumbnail = thumbnail.crop(
+                        (left - margin, top - margin, right + margin, bottom + margin)
+                    )
             thumbnail.thumbnail((48, 48), Image.Resampling.LANCZOS)
             buffer = BytesIO()
             thumbnail.save(buffer, format="PNG")
@@ -153,7 +162,7 @@ st.html("""
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     tab_label("1. 極巨攻擊", "max_attack-transparent.png"),
-    tab_label("2. 極巨防禦", "max_defense-transparent.png"),
+    tab_label("2. 極巨防禦", "max_defense-transparent.png", trim_padding=True),
     tab_label("3. DPS 計算", "dps-transparent.png"),
     tab_label("4. 屬性克制", "type-transparent.png"),
     tab_label("5. 團體戰輸出排行", "raid-transparent.png"),
