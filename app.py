@@ -174,6 +174,16 @@ st.html("""
     width: auto;
 }
 @media (max-width: 600px) {
+    /* Keep paired type selectors on one row on phones. */
+    [data-testid="stTabPanel"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:first-child [data-testid="stSelectbox"]):has(> [data-testid="stColumn"]:last-child [data-testid="stSelectbox"]) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+    [data-testid="stTabPanel"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:first-child [data-testid="stSelectbox"]):has(> [data-testid="stColumn"]:last-child [data-testid="stSelectbox"]) > [data-testid="stColumn"] {
+        width: 100%;
+        min-width: 0;
+    }
     [data-testid="stMainBlockContainer"] {
         --mobile-header-height: 3.75rem;
         --mobile-weather-height: 5.25rem;
