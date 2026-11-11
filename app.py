@@ -178,6 +178,16 @@ st.html("""
     [data-testid="stElementContainer"]:has(.mobile-weather-label) { display: none; }
 }
 @media (max-width: 600px) {
+    [data-testid="stTabPanel"] [data-testid="stLayoutWrapper"]:has(> [data-testid="stHorizontalBlock"] :is(.st-key-att_t1, .st-key-dps_t1, .st-key-c_t1, .st-key-def_atk)) {
+        position: sticky;
+        top: calc(var(--mobile-header-height) + var(--mobile-weather-height) + 4.25rem);
+        z-index: 9;
+        background: var(--background-color, Canvas);
+    }
+    :is(.st-key-att_t1, .st-key-att_t2, .st-key-dps_t1, .st-key-dps_t2, .st-key-c_t1, .st-key-c_t2, .st-key-def_atk) [data-testid="stWidgetLabel"] {
+        position: absolute;
+        clip-path: inset(50%);
+    }
     [data-testid="stElementContainer"]:has(.mobile-weather-label) { margin-bottom: -0.75rem; }
     .mobile-weather-label { font-size: 0.875rem; }
     .st-key-global_weather [data-testid="stWidgetLabel"] {
@@ -229,7 +239,7 @@ st.html("""
     }
     [data-testid="stTabs"] [role="tablist"] [role="tab"] {
         min-width: 0;
-        min-height: 56px;
+        min-height: 3.5rem;
         justify-content: center;
         padding: 0.25rem 0;
         border-radius: 0.65rem;
