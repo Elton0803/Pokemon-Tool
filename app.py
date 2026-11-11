@@ -173,22 +173,18 @@ st.html("""
     width: auto;
 }
 @media (max-width: 600px) {
-    [data-testid="stMainBlockContainer"] {
-        padding-bottom: calc(8rem + 1.5 * env(safe-area-inset-bottom, 0px));
-    }
     [data-testid="stTabs"] [role="tablist"] {
-        position: fixed;
-        inset: auto 0 0;
-        transform: translateY(-50%);
+        position: sticky;
+        top: 3.75rem;
         z-index: 10;
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0.25rem;
         box-sizing: border-box;
         width: 100%;
-        padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+        padding: 0.35rem 0.5rem 0.35rem;
         background: var(--background-color, Canvas);
-        border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
     }
     [data-testid="stTabs"] [role="tablist"] [role="tab"] {
         min-width: 0;
