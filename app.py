@@ -130,7 +130,8 @@ with c_weather:
     current_weather = st.selectbox(
         "🌤️ 天氣加成", 
         ["無", "晴朗", "雨天", "多雲", "陰天", "強風", "下雪", "起霧"],
-        index=0
+        index=0,
+        key="global_weather",
     )
 
 # ==========================================
@@ -173,9 +174,29 @@ st.html("""
     width: auto;
 }
 @media (max-width: 600px) {
+    [data-testid="stMainBlockContainer"] {
+        --mobile-header-height: 3.75rem;
+        --mobile-weather-height: 5.25rem;
+    }
+    [data-testid="stLayoutWrapper"]:has(> [data-testid="stHorizontalBlock"] .st-key-global_weather) {
+        position: sticky;
+        top: var(--mobile-header-height);
+        z-index: 11;
+        height: var(--mobile-weather-height);
+        background: var(--background-color, Canvas);
+    }
+    [data-testid="stHorizontalBlock"]:has(.st-key-global_weather) > [data-testid="stColumn"]:first-child {
+        display: none;
+    }
+    [data-testid="stTabPanel"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:first-child:has(> [data-testid="stHeading"]) {
+        display: none;
+    }
+    [data-testid="stTabPanel"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(h2[id="6fc7479a"]) + [data-testid="stElementContainer"] {
+        order: 1;
+    }
     [data-testid="stTabs"] [role="tablist"] {
         position: sticky;
-        top: 3.75rem;
+        top: calc(var(--mobile-header-height) + var(--mobile-weather-height));
         z-index: 10;
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
