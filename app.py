@@ -163,8 +163,10 @@ st.html("""
     width: auto;
 }
 @media (max-width: 600px) {
+    [data-testid="stTabs"] [role="tablist"] {
+        column-gap: 2rem;
+    }
     [data-testid="stTabs"] [role="tab"] {
-        padding-inline: 0.5rem;
         min-height: 44px;
     }
 }
