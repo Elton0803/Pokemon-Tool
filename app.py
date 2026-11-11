@@ -173,24 +173,44 @@ st.html("""
     width: auto;
 }
 @media (max-width: 600px) {
+    [data-testid="stMainBlockContainer"] {
+        padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    }
     [data-testid="stTabs"] [role="tablist"] {
-        column-gap: 2rem;
+        position: fixed;
+        inset: auto 0 0;
+        z-index: 10;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.25rem;
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+        background: var(--background-color, Canvas);
+        border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
     }
-    [data-testid="stTabs"] [role="tab"] {
-        min-height: 44px;
-        position: relative;
+    [data-testid="stTabs"] [role="tablist"] [role="tab"] {
+        min-width: 0;
+        min-height: 56px;
+        justify-content: center;
+        padding: 0.25rem 0;
+        border-radius: 0.65rem;
     }
+    [data-testid="stTabs"] [role="tab"] [data-testid="stMarkdownContainer"] > p {
+        flex-direction: column;
+        gap: 0.2rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+    [data-testid="stTabs"] [role="tab"] [data-testid="stMarkdownContainer"] > p > img {
+        max-height: 1.5rem;
+    }
+    [data-testid="stTabs"] [role="tablist"] > :not([role="tab"]),
     [data-testid="stTabs"] [role="tab"] > .react-aria-SelectionIndicator {
-        visibility: hidden;
+        display: none;
     }
-    [data-testid="stTabs"] [role="tab"][aria-selected="true"]::after {
-        content: "";
-        position: absolute;
-        inset-inline: 0;
-        bottom: 0;
-        height: 2px;
-        background: currentColor;
-        pointer-events: none;
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+        background: color-mix(in srgb, currentColor 12%, transparent);
     }
 }
 </style>
