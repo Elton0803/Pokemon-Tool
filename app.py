@@ -112,6 +112,16 @@ data_def, chart_def, err_def = load_data_and_chart("Def.xlsx")
 data_dps, chart_dps, err_dps = load_data_and_chart("DPS.xlsx")
 data_list, err_list = load_simple_list("list.xlsx")
 
+def apply_attack_target(target_types):
+    target = st.session_state.att_target
+    if target is not None and target_types[target] is not None:
+        st.session_state.att_t1, st.session_state.att_t2 = target_types[target]
+
+
+def clear_attack_target():
+    st.session_state.att_target = None
+
+
 # ==========================================
 # 全域 UI：天氣設定 (放置於分頁右上角)
 # ==========================================
@@ -202,9 +212,45 @@ with tab1:
     st.caption("輸出 = 攻擊 * (超極巨*450/極巨*350) * 屬修 * 屬性剋制倍率")
     if err_att: st.error(err_att)
     elif data_att is not None:
+        attack_types = list(chart_att.columns)
+        second_types = ["無"] + attack_types
+        target_names = data_att["寶可夢"].dropna().astype(str).str.strip()
+        target_names = target_names[target_names.ne("")].unique()
+
+        # Att.xlsx 的「屬性」是攻擊招式屬性，對手屬性另查寶可夢資料。
+        pokemon_types = {}
+        for frame, columns in (
+            (data_list, ["名稱", "屬性 1", "屬性 2"]),
+            (data_def, ["寶可夢", "屬性一", "屬性二"]),
+        ):
+            if frame is not None and all(column in frame.columns for column in columns):
+                for name, type1, type2 in frame[columns].dropna(subset=columns[:2]).itertuples(index=False, name=None):
+                    type1 = str(type1).strip()
+                    type2 = str(type2).strip() if pd.notna(type2) else "無"
+                    if type1 in attack_types and type2 in second_types:
+                        pokemon_types.setdefault(str(name).strip(), (type1, type2))
+
+        target_types = {
+            name: pokemon_types.get(name) or pokemon_types.get(name.removeprefix("超極巨"))
+            for name in target_names
+        }
+        target = st.selectbox(
+            "請選擇對手寶可夢",
+            target_names,
+            index=None,
+            placeholder="搜尋 Att.xlsx 裡的寶可夢",
+            key="att_target",
+            on_change=apply_attack_target,
+            args=(target_types,),
+        )
+        if target is not None and target_types[target] is None:
+            st.info("找不到這隻寶可夢的屬性，請用下方選單手動選擇。")
+
         c1, c2 = st.columns(2)
-        with c1: def_t1 = st.selectbox("對手屬性 1", list(chart_att.columns), key="att_t1")
-        with c2: def_t2 = st.selectbox("對手屬性 2", ["無"] + list(chart_att.columns), key="att_t2")
+        with c1:
+            def_t1 = st.selectbox("對手屬性 1", attack_types, key="att_t1", on_change=clear_attack_target)
+        with c2:
+            def_t2 = st.selectbox("對手屬性 2", second_types, key="att_t2", on_change=clear_attack_target)
         
         results = []
         try:
