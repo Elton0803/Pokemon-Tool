@@ -237,7 +237,7 @@ with tab1:
             "請選擇對手寶可夢",
             target_names,
             index=None,
-            placeholder="搜尋寶可夢",
+            placeholder="搜尋極巨對戰對手，或直接選擇屬性",
             key="att_target",
             on_change=apply_target_types,
             args=("att", target_types),
@@ -266,7 +266,7 @@ with tab1:
                 if pd.isna(base_atk) or base_atk <= 0: continue
                 
                 stab_bonus = 1.2 if 'Y' in str(row.get('屬修', 'N')).upper() else 1.0
-                move_p = 450 if 'G' in str(row.get('超級巨/極巨', 'D')).upper() else 350
+                move_p = 450 if 'G' in str(row.get('超極巨/極巨', 'D')).upper() else 350
                 
                 mult = get_multiplier(chart_att, atk_t, def_t1, def_t2)
                 w_mult = get_weather_mult(atk_t, current_weather)
@@ -362,7 +362,7 @@ with tab3:
                         raid_targets.setdefault(name, (type1, type2))
 
         target_poke = st.selectbox(
-            "請選擇對手寶可夢",
+            "請選擇團戰寶可夢",
             list(raid_targets),
             index=None,
             placeholder="搜尋團體戰對手，或直接選擇屬性",
