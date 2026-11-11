@@ -261,6 +261,13 @@ st.html("""
         background: color-mix(in srgb, currentColor 12%, transparent);
     }
 }
+@media (max-width: 600px) and (height < 700px) {
+    [data-testid="stLayoutWrapper"]:has(> [data-testid="stHorizontalBlock"] .st-key-global_weather),
+    [data-testid="stTabs"] [role="tablist"],
+    [data-testid="stTabPanel"] [data-testid="stLayoutWrapper"]:has(> [data-testid="stHorizontalBlock"] :is(.st-key-att_t1, .st-key-dps_t1, .st-key-c_t1, .st-key-def_atk)) {
+        position: static;
+    }
+}
 </style>
 """)
 
