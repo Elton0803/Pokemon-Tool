@@ -238,7 +238,7 @@ with tab1:
             "請選擇對手寶可夢",
             target_names,
             index=None,
-            placeholder="搜尋 Att.xlsx 裡的寶可夢",
+            placeholder="搜尋寶可夢",
             key="att_target",
             on_change=apply_attack_target,
             args=(target_types,),
