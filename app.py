@@ -174,11 +174,12 @@ st.html("""
 }
 @media (max-width: 600px) {
     [data-testid="stMainBlockContainer"] {
-        padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(8rem + 1.5 * env(safe-area-inset-bottom, 0px));
     }
     [data-testid="stTabs"] [role="tablist"] {
         position: fixed;
         inset: auto 0 0;
+        transform: translateY(-50%);
         z-index: 10;
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
