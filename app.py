@@ -125,6 +125,7 @@ def clear_target(prefix):
 # ==========================================
 # 全域 UI：天氣設定 (放置於分頁右上角)
 # ==========================================
+st.html('<span class="mobile-weather-label" aria-hidden="true">天氣加成</span>')
 c_empty, c_weather = st.columns([5, 1])
 with c_weather:
     current_weather = st.selectbox(
@@ -173,7 +174,16 @@ st.html("""
     max-height: 1.125rem;
     width: auto;
 }
+@media (width > 600px) {
+    [data-testid="stElementContainer"]:has(.mobile-weather-label) { display: none; }
+}
 @media (max-width: 600px) {
+    [data-testid="stElementContainer"]:has(.mobile-weather-label) { margin-bottom: -0.75rem; }
+    .mobile-weather-label { font-size: 0.875rem; }
+    .st-key-global_weather [data-testid="stWidgetLabel"] {
+        position: absolute;
+        clip-path: inset(50%);
+    }
     /* Keep paired type selectors on one row on phones. */
     [data-testid="stTabPanel"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:first-child [data-testid="stSelectbox"]):has(> [data-testid="stColumn"]:last-child [data-testid="stSelectbox"]) {
         display: grid;
@@ -186,7 +196,7 @@ st.html("""
     }
     [data-testid="stMainBlockContainer"] {
         --mobile-header-height: 3.75rem;
-        --mobile-weather-height: 5.25rem;
+        --mobile-weather-height: 3.25rem;
     }
     [data-testid="stLayoutWrapper"]:has(> [data-testid="stHorizontalBlock"] .st-key-global_weather) {
         position: sticky;
