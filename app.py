@@ -156,16 +156,21 @@ st.html("""
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
+    font-size: 1rem;
+}
+[data-testid="stTabs"] [role="tab"] [data-testid="stMarkdownContainer"] > p > img {
+    max-height: 1.125rem;
+    width: auto;
 }
 </style>
 """)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    tab_label("1. 極巨攻擊", "max_attack-transparent.png"),
-    tab_label("2. 極巨防禦", "max_defense-transparent.png", trim_padding=True),
-    tab_label("3. DPS 計算", "dps-transparent.png"),
-    tab_label("4. 屬性克制", "type-transparent.png"),
-    tab_label("5. 團體戰輸出排行", "raid-transparent.png"),
+    tab_label("極巨攻擊", "max_attack-transparent.png"),
+    tab_label("極巨防禦", "max_defense-transparent.png", trim_padding=True),
+    tab_label("DPS 計算", "dps-transparent.png"),
+    tab_label("屬性克制", "type-transparent.png"),
+    tab_label("團體戰輸出排行", "raid-transparent.png"),
 ])
 
 # -------------------------------------------------------------------------
