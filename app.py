@@ -334,7 +334,7 @@ with tab1:
                 if pd.isna(base_atk) or base_atk <= 0: continue
                 
                 stab_bonus = 1.2 if 'Y' in str(row.get('屬修', 'N')).upper() else 1.0
-                move_kind = row.get("超級巨/極巨", row.get("超極巨/極巨", "D"))
+                move_kind = row.get("超極巨/極巨", row.get("超極巨/極巨", "D"))
                 move_p = 450 if str(move_kind).strip().upper() == "G" else 350
                 
                 mult = get_multiplier(chart_att, atk_t, def_t1, def_t2)
